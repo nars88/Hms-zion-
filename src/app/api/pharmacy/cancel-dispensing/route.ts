@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/pharmacy/cancel-dispensing
 // Cancels dispensing - sets visit to COMPLETED without deducting inventory or charging for medications
 export async function POST(request: Request) {

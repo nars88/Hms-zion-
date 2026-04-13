@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 type Department = 'Lab' | 'Radiology' | 'Sonar'
 
 // POST /api/emergency/doctor/result-reviewed

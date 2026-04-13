@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/emergency/doctor/append-task - Append a task to visit notes (e.g. PHARMACY_SENT)
 export async function POST(request: Request) {
   try {

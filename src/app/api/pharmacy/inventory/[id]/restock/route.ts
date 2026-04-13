@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // PATCH /api/pharmacy/inventory/[id]/restock – add quantity to existing drug
 export async function PATCH(
   request: Request,

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/billing/invoice/add-medications
 // Adds medication items to the bill/invoice
 export async function POST(request: Request) {

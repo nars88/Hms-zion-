@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/admin/create-pharmacist
 // Creates the pharmacy user account
 export async function POST(request: Request) {

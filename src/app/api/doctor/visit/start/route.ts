@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/doctor/visit/start
 // Starts a visit and adds consultation fee to invoice
 export async function POST(request: Request) {

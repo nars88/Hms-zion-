@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
 
 // POST /api/billing/invoices/[id]/pay
 // Marks invoice as paid and automatically updates QR status to CLEARED
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -14,8 +15,7 @@ export async function POST(
     const { paymentMethod } = body
 
     // Get current user (accountant)
-    const cookieStore = cookies()
-    const userIdCookie = cookieStore.get('zionmed_auth_token')
+    const userIdCookie = request.cookies.get('zionmed_auth_token')
     if (!userIdCookie?.value) {
       return NextResponse.json(
         { error: 'Unauthorized' },

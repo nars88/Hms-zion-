@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 const ER_ADMISSION_FEE_IQD = 50_000
 
 // POST /api/er/create-case

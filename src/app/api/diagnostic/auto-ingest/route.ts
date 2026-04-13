@@ -4,6 +4,8 @@ import { VisitStatus } from '@prisma/client'
 import path from 'path'
 import { mkdir, readdir, readFile, rename, copyFile, unlink } from 'fs/promises'
 
+export const dynamic = 'force-dynamic'
+
 type Department = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 
 type ResultEntry = {

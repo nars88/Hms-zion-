@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 type DiagnosticDepartment = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 const DEPARTMENT_TO_TYPE: Record<DiagnosticDepartment, string> = {
   Lab: 'LAB_REQUESTED',

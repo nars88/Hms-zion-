@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // PATCH /api/patients/[patientId] - update triageLevel and/or allergies (e.g. after ER admission)
 export async function PATCH(
   request: Request,

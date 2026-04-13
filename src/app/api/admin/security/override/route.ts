@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
 
 // POST /api/admin/security/override
 // Manual override for Admin to clear a patient's QR status (emergency/system outage)
 // Creates an audit log entry
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { patientId, visitId, reason } = body
@@ -18,9 +19,8 @@ export async function POST(request: Request) {
     }
 
     // Get current user (must be Admin)
-    const cookieStore = cookies()
-    const userIdCookie = cookieStore.get('zionmed_auth_token')
-    const roleCookie = cookieStore.get('zionmed_user_role')
+    const userIdCookie = request.cookies.get('zionmed_auth_token')
+    const roleCookie = request.cookies.get('zionmed_user_role')
 
     if (!userIdCookie?.value || roleCookie?.value !== 'ADMIN') {
       return NextResponse.json(

@@ -4,6 +4,8 @@ import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { syncUserDepartmentLink, verifyDepartmentExists } from '@/lib/departmentEmployeeSync'
 
+export const dynamic = 'force-dynamic'
+
 /** CASHIER is deprecated; use ACCOUNTANT — excluded from admin role dropdowns */
 const VALID_ROLES = Object.values(UserRole).filter((r) => String(r) !== 'CASHIER')
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/auth/create-security-user
 // Creates the Security/Gatekeeper user account
 // This is a one-time setup endpoint

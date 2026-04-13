@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import { DEMO_RADIOLOGY_XRAY_IMAGE_URL, DEMO_SONAR_ULTRASOUND_IMAGE_URL } from '@/config/demoDiagnosticImageUrls'
 
+export const dynamic = 'force-dynamic'
+
 type Department = 'Radiology' | 'Sonar' | 'Lab'
 
 type ResultEntry = {

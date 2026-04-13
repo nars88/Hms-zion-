@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import type { ImagingResultRecord } from '@/lib/imagingRelease'
 
+export const dynamic = 'force-dynamic'
+
 type Department = 'Radiology' | 'Sonar' | 'ECG'
 const RESULT_KEYS = {
   Radiology: 'radiologyResults',

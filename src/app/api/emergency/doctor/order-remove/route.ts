@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/emergency/doctor/order-remove - Remove one order from erOrders by timestamp (at)
 // So it disappears from Lab, Radiology, Sonar, and Nurse task views.
 export async function POST(request: Request) {

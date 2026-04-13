@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/security/check/[patientId]
 // Returns QR status for a patient (for security guard scanning)
 export async function GET(

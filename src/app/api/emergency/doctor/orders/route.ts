@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/emergency/doctor/orders - Save doctor medications & lab tests (Visit.notes JSON)
 export async function POST(request: Request) {
   try {

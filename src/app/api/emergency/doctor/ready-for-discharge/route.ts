@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 const DIAG_ORDER_TYPES = ['LAB', 'LAB_REQUESTED', 'RADIOLOGY_REQUESTED', 'SONAR_REQUESTED']
 const ORDER_TO_RESULTS: Record<string, 'labResults' | 'radiologyResults' | 'sonarResults'> = {
   LAB: 'labResults',

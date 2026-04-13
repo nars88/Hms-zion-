@@ -1,14 +1,12 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
 // Helper to detect if the current user is an Accountant (billing-only access)
-function isAccountant(): boolean {
-  const cookieStore = cookies()
-  const roleCookie = cookieStore.get('zionmed_user_role')
+function isAccountant(request: NextRequest): boolean {
+  const roleCookie = request.cookies.get('zionmed_user_role')
   if (!roleCookie?.value) return false
 
   // Cookie stores the app role string, which should match Prisma UserRole
@@ -19,9 +17,9 @@ function isAccountant(): boolean {
 // Privacy rule:
 // - ACCOUNTANT can ONLY see billing-related fields (no diagnosis / medical notes).
 // - Other roles (ADMIN / DOCTOR, etc.) can extend this later if needed.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const accountant = isAccountant()
+    const accountant = isAccountant(request)
 
     if (!accountant) {
       // For now, we only expose this endpoint to accountants and admins in the future.

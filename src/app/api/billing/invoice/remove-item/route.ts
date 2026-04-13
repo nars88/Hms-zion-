@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/billing/invoice/remove-item
 // Removes an item from invoice (for pending orders only)
 export async function POST(request: Request) {

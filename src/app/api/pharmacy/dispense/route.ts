@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/pharmacy/dispense
 // Marks prescription as dispensed and updates visit status to COMPLETED
 export async function POST(request: Request) {

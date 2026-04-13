@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/pharmacy/prescription/[visitId]/allergies
 // Returns patient allergies for a specific visit (for safety check)
 export async function GET(

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 const DIAG_ORDER_TYPES = ['LAB', 'LAB_REQUESTED', 'RADIOLOGY_REQUESTED', 'SONAR_REQUESTED']
 const RESULTS_KEYS = ['labResults', 'radiologyResults', 'sonarResults'] as const
 const ORDER_TO_RESULTS: Record<string, (typeof RESULTS_KEYS)[number]> = {

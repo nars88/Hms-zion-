@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/pharmacy/orders/[orderId]/close
 // Close the order without dispensing (patient declined / end visit).
 // ARCHIVE ONLY: prescription/order is never deleted; status is updated to CLOSED for history/reports.

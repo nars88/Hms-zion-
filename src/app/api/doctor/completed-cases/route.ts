@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { Prisma, VisitStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 type ImagingRow = {
   result?: string
   attachmentPath?: string

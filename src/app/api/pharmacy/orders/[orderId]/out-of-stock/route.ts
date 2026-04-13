@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/pharmacy/orders/[orderId]/out-of-stock
 // Mark order as Out of Stock — triggers alert on Doctor and Nurse dashboards for that bed/visit.
 export async function POST(

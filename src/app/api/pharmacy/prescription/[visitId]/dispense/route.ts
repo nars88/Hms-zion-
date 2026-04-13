@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
+
+export const dynamic = 'force-dynamic'
 
 // POST /api/pharmacy/prescription/[visitId]/dispense
 // Marks prescription as dispensed, adds medication prices to invoice, updates visit status
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { visitId: string } }
 ) {
   try {
@@ -14,8 +15,7 @@ export async function POST(
     const { medicationPrices } = body // Array of { medicineName, price }
 
     // Get current user (pharmacist)
-    const cookieStore = cookies()
-    const userIdCookie = cookieStore.get('zionmed_auth_token')
+    const userIdCookie = request.cookies.get('zionmed_auth_token')
     if (!userIdCookie?.value) {
       return NextResponse.json(
         { error: 'Unauthorized' },

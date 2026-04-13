@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServicePrice, mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/radiology/complete-report
 // Completes a radiology report and adds the price to invoice
 export async function POST(request: Request) {

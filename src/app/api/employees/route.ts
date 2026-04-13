@@ -4,6 +4,8 @@ import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { syncUserDepartmentLink, verifyDepartmentExists } from '@/lib/departmentEmployeeSync'
 
+export const dynamic = 'force-dynamic'
+
 const DEPT_ROLE_MAP: Record<string, string[]> = {
   laboratory: ['LAB_TECH'],
   radiology: ['RADIOLOGY_TECH'],

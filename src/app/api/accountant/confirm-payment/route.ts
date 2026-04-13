@@ -1,17 +1,17 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+
+export const dynamic = 'force-dynamic'
 
 const ALLOWED_ROLES = ['ACCOUNTANT', 'ADMIN']
 
 // POST /api/accountant/confirm-payment
 // Marks bill as PAID. Only Accountant or Admin can trigger this.
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const roleCookie = cookieStore.get('zionmed_user_role')
-    const userIdCookie = cookieStore.get('zionmed_auth_token')
+    const roleCookie = request.cookies.get('zionmed_user_role')
+    const userIdCookie = request.cookies.get('zionmed_auth_token')
 
     if (!userIdCookie?.value || !roleCookie?.value || !ALLOWED_ROLES.includes(roleCookie.value)) {
       return NextResponse.json(

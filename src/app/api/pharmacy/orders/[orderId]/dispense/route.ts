@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus, VisitStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 type OrderItem = { medicineName?: string; dosage?: string; quantity?: number; unitPrice?: number; totalPrice?: number }
 
 // POST /api/pharmacy/orders/[orderId]/dispense
