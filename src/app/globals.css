@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '../styles/rtl.css';
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Refined Dark Theme - Softer Palette */
+  --bg-primary: #0B1120;      /* Deep Navy - Background */
+  --bg-secondary: #161F32;    /* Card Background */
+  --bg-tertiary: #1E293B;      /* Secondary elements */
+  
+  --text-primary: #F1F5F9;    /* Primary text */
+  --text-secondary: #94A3B8;  /* Secondary text */
+  --text-accent: #06B6D4;      /* Accent Blue (Cyan) */
+}
+
+.light {
+  /* Light Theme - Clean & Professional */
+  --bg-primary: #F1F5F9;      /* Light Slate - Background */
+  --bg-secondary: #FFFFFF;    /* White - Card Background */
+  --bg-tertiary: #E2E8F0;      /* Light Gray - Secondary elements */
+  
+  --text-primary: #0F172A;    /* Dark Slate - Primary text */
+  --text-secondary: #64748B;  /* Slate Gray - Secondary text */
+  --text-accent: #1E40AF;      /* Primary Blue - Accent */
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: #F1F5F9;
+  color: var(--text-primary);
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: #F1F5F9;
+  color: var(--text-primary);
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.dark body {
+  background-color: #0B1120;
+}
+
+.light body {
+  background-color: #F1F5F9;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+  border: 1px solid #0B1120;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border: 1px solid #F1F5F9;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Invoice table: thin scrollbar + stable gutter (no layout jump) */
+.invoice-table-scroll {
+  scrollbar-gutter: stable;
+}
+.invoice-table-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.invoice-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.invoice-table-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563; /* gray-600 */
+  border-radius: 3px;
+}
+.invoice-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Utility classes */
+@layer utilities {
+  .bg-dark-navy {
+    background-color: var(--bg-primary);
+  }
+  
+  .bg-dark-navy-secondary {
+    background-color: var(--bg-secondary);
+  }
+  
+  .text-primary {
+    color: var(--text-primary);
+  }
+  
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(22, 31, 50, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.light .glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Animations */
+@keyframes scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
+  background-size: 1000px 100%;
+}
+
+/* Print: hide sidebar and nav so only report/receipt content prints */
+@media print {
+  body * { visibility: hidden; }
+  .print\\:hidden,
+  [data-sidebar],
+  aside,
+  nav[aria-label="Sidebar"],
+  .no-print,
+  header button,
+  .flex.h-screen > aside { display: none !important; }
+  .glass,
+  .glass * { visibility: visible; }
+  .glass {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
+

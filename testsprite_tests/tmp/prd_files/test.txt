@@ -1,0 +1,11 @@
+Reception: Only search and register patients.
+
+Intake: Records vital signs (BP must have '/', Temp must be 35-42).
+
+Accountant: View invoices with 10s auto-refresh. Receptionists are forbidden here.
+
+Patient Registration: Ensure mandatory fields (Name, Age) cannot be empty.
+
+Pharmacy/X-ray: Only accessible after Intake is completed.
+
+Error Handling: Any unauthorized attempt should show a 'Toast' message or a 403 Page.

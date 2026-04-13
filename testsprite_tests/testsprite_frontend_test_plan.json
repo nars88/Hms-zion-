@@ -1,0 +1,2154 @@
+[
+  {
+    "id": "TC001",
+    "title": "Search for an existing patient and add them to the receptionist queue via Quick Actions",
+    "description": "Verifies receptionist can search patients, select a result, use a Quick Action, and see the patient in the queue.",
+    "category": "Reception Patient Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient A\" (or its patient ID) into the patient search input"
+      },
+      {
+        "type": "action",
+        "description": "Click on a patient in the search results list"
+      },
+      {
+        "type": "action",
+        "description": "Click a \"Quick Action\" button for the selected patient that adds or sends the patient to the queue"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Test Patient A\" is visible in the receptionist queue"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Search using QR input text and view matching patient results",
+    "description": "Verifies receptionist can search using QR input text and see matching results to select.",
+    "category": "Reception Patient Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait until any loading spinner disappears before interacting with intake UI"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Type a QR-like code value into the patient search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the search results section is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on a patient in the search results list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the selected patient details panel (or selected patient section) is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Register a new patient with mandatory fields and confirm they appear in queue",
+    "description": "Verifies receptionist can open registration modal, submit a valid form, and see the new patient appear in the queue.",
+    "category": "Reception Patient Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the button to open the patient registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Register\" is visible in the modal header"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"33\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Register\" button in the modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Test Patient\" is visible in the receptionist queue"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Registration validation: missing Name prevents submission and keeps modal open",
+    "description": "Verifies registration modal blocks submission when Name is empty and shows a visible validation message.",
+    "category": "Reception Patient Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the button to open the patient registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Register\" is visible in the modal header"
+      },
+      {
+        "type": "action",
+        "description": "Type \"45\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Register\" button in the modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation message indicating Name is required is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the registration modal is still visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Registration validation: missing Age prevents submission and keeps modal open",
+    "description": "Verifies registration modal blocks submission when Age is empty and shows a visible validation message.",
+    "category": "Reception Patient Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the button to open the patient registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Register\" is visible in the modal header"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Age Missing\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Register\" button in the modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation message indicating Age is required is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the registration modal is still visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Search with no matches shows an empty state message",
+    "description": "Verifies searching for a non-existent patient shows a visible 'no results' state rather than stale results.",
+    "category": "Reception Patient Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"NonExistentPatient_999999\" into the patient search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No results\" or \"No patients found\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the search results list is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Queue update persists after selecting a different patient",
+    "description": "Verifies adding a patient to the queue remains visible even after selecting another patient from search results.",
+    "category": "Reception Patient Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Type a patient name or patient ID into the patient search input"
+      },
+      {
+        "type": "action",
+        "description": "Click on a patient in the search results list"
+      },
+      {
+        "type": "action",
+        "description": "Click a \"Quick Action\" button for the selected patient that adds or sends the patient to the queue"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the selected patient name is visible in the receptionist queue"
+      },
+      {
+        "type": "action",
+        "description": "Click on a different patient in the search results list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the originally queued patient name is still visible in the receptionist queue"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Register a patient successfully with required fields (Name and Age)",
+    "description": "Verifies a receptionist can register a new patient when mandatory fields are provided and sees success feedback and the patient in the queue.",
+    "category": "Patient Registration (Validation)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient A\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"34\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" (or \"Patient registered\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Test Patient A\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Validation blocks submission when Name is empty",
+    "description": "Verifies the registration form shows a field-level error and does not submit when Name is missing.",
+    "category": "Patient Registration (Validation)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"45\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Name is required\" (or \"Please enter name\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Validation blocks submission when Age is empty",
+    "description": "Verifies the registration form shows a field-level error and does not submit when Age is missing.",
+    "category": "Patient Registration (Validation)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient B\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Age is required\" (or \"Please enter age\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Validation triggers when both Name and Age are empty",
+    "description": "Verifies multiple required-field errors appear and submission is blocked when both mandatory fields are missing.",
+    "category": "Patient Registration (Validation)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Name is required\" (or \"Please enter name\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Age is required\" (or \"Please enter age\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Age field rejects non-numeric input",
+    "description": "Verifies the Age field prevents or flags non-numeric values and blocks submission.",
+    "category": "Patient Registration (Validation)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient C\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"abc\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Enter a valid age\" (or \"Age must be a number\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Age field rejects zero or negative values",
+    "description": "Verifies the registration form blocks unrealistic age values such as 0 or negative numbers.",
+    "category": "Patient Registration (Validation)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient D\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"0\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Enter a valid age\" (or \"Age must be greater than 0\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Successful registration with optional fields filled does not break validation",
+    "description": "Verifies optional fields can be filled and submission still succeeds when required fields are valid.",
+    "category": "Patient Registration (Validation)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register Patient\" (or \"New Patient\") button to open the registration modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient Registration\" (or \"Register Patient\") is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Patient E\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"29\" into the Age field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"5551234567\" into an optional Phone field (if present)"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Notes for testing\" into an optional Notes field (if present)"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" (or \"Register\") button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Success\" (or \"Patient registered\") is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Test Patient E\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Submit vitals successfully with valid BP, temperature, and heart rate",
+    "description": "Verifies an intake nurse can select a visit, enter valid vitals, submit, and see a confirmation toast.",
+    "category": "Intake Vitals Entry",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"37\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "BP validation error when missing '/' then successful submit after correction",
+    "description": "Verifies blood pressure format validation blocks submission until corrected to systolic/diastolic with '/'.",
+    "category": "Intake Vitals Entry",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12080\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"37\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Blood pressure must include '/' and be in format like 120/80\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Temperature validation error for below range then successful submit after correction",
+    "description": "Verifies temperature must be within 35 to 42 and shows an error when below range.",
+    "category": "Intake Vitals Entry",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait until any loading spinner disappears before interacting with intake UI"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"34\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Temperature must be between 35°C and 42°C\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"35\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Temperature validation error for above range then successful submit after correction",
+    "description": "Verifies temperature must be within 35 to 42 and shows an error when above range.",
+    "category": "Intake Vitals Entry",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait until any loading spinner disappears before interacting with intake UI"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"42.5\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Temperature must be between 35°C and 42°C\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"42\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "BP validation: missing diastolic value then successful submit after correction",
+    "description": "Verifies blood pressure field rejects incomplete systolic/diastolic input and allows submission after fixing.",
+    "category": "Intake Vitals Entry",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"37\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"blood pressure\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "BP validation: extra separators (e.g., multiple '/') then successful submit after correction",
+    "description": "Verifies blood pressure field rejects malformed values with multiple separators and allows submission after correction.",
+    "category": "Intake Vitals Entry",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120//80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"37\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"format\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Heart rate validation error (non-numeric) then successful submit after correction",
+    "description": "Verifies heart rate field rejects non-numeric input and allows submission once corrected.",
+    "category": "Intake Vitals Entry",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "action",
+        "description": "Type \"120/80\" into the blood pressure field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"37\" into the temperature field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"abc\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"heart rate\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"75\" into the heart rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" or \"Submit vitals\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Toast\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "End-to-end intake page loads and allows selecting a patient visit",
+    "description": "Verifies the intake page renders after login and a visit can be selected before entering vitals.",
+    "category": "Intake Vitals Entry",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Intake\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Select a patient visit"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Selected visit details\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Enable downstream actions after completing Intake (happy path)",
+    "description": "Verifies that completing Intake for a visit results in an 'Intake completed' status and downstream Pharmacy/X-ray actions become enabled for that visit.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\" or \"/reception\""
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Attempt downstream action on a visit without completed Intake shows blocked state/message",
+    "description": "Verifies that for a visit without completed Intake, Pharmacy/X-ray action cannot be opened and shows a disabled state, toast, or access-blocked page.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/intake\" or \"/reception\""
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Reception view reflects Intake completion status for a visit",
+    "description": "Verifies that the Reception dashboard shows a clear 'Intake completed' indicator for a visit after Intake is completed.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /reception"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify page title contains \"Reception\" or Verify text \"Reception\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Intake page shows completion confirmation after vitals submission",
+    "description": "Verifies that the Intake workflow provides a visible confirmation or status indicating Intake is completed after submitting vitals.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /intake"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify page title contains \"Intake\" or Verify text \"Intake\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Blocked downstream access does not navigate away from current page when action is disabled",
+    "description": "Verifies that attempting a gated Pharmacy/X-ray action for an incomplete Intake visit does not allow navigation and keeps the user on the current page while showing a disabled state or message.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /reception"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Gating remains enforced after page refresh/navigation to Intake for an incomplete visit",
+    "description": "Verifies that an incomplete Intake visit remains gated (Pharmacy/X-ray actions still blocked) after leaving and returning to the workflow pages.",
+    "category": "Post-Intake Access Control (Pharmacy/X-ray gating)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /intake"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /reception"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/reception\""
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Accountant can view invoices, review receipt details, print, and confirm payment to discharge visit",
+    "description": "Verifies the primary accountant workflow from invoice selection through printing and confirming payment with visible success state.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify unauthorized access is safely blocked: accept any of (URL redirected to \"/reception\", visible \"Access Denied\", visible \"403\", or visible \"Unauthorized\") as PASS"
+      },
+      {
+        "type": "action",
+        "description": "Select an invoice from list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"receipt panel\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Confirm payment and discharge completed visit"
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Accountant sees invoice list and it refreshes without breaking the page",
+    "description": "Verifies the invoices list is visible and remains stable across an auto-refresh interval.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"invoices list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Wait for 12 seconds"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"invoices list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Selecting an invoice shows service items and totals in the receipt panel",
+    "description": "Verifies that selecting an invoice reveals receipt details including items and totals.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Select an invoice from list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Total\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"service items list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Confirm payment shows visible success confirmation and reflects discharged status",
+    "description": "Verifies successful payment confirmation shows a visible success message and indicates the visit is discharged/paid.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Select an invoice from list"
+      },
+      {
+        "type": "action",
+        "description": "Confirm payment and discharge completed visit"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Payment confirmed\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Role forbidden: Receptionist cannot access Accountant page and sees an access-blocking message",
+    "description": "Verifies that a user without accountant permissions cannot access the accountant dashboard and sees a toast or 403 page.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"receptionist.user@example.com\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"WrongPassword!123\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/login\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Confirm payment error shows error toast and user remains on invoice receipt panel",
+    "description": "Verifies that when payment confirmation fails, an error toast appears and the selected invoice context remains visible.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Select an invoice from list"
+      },
+      {
+        "type": "action",
+        "description": "Confirm payment and discharge completed visit"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Error\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Receipt panel is not shown before selecting any invoice",
+    "description": "Verifies the page does not display invoice-specific receipt details until an invoice is selected.",
+    "category": "Accountant Billing and Receipt",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"invoices list\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Select an invoice\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Search archived bills and open an invoice details modal from a grouped day section",
+    "description": "Verifies archived bills can be searched, grouped by day, expanded, and an invoice details modal can be opened and reviewed.",
+    "category": "Accountant Archive Review",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"a\" into the global search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click to expand a grouped day section"
+      },
+      {
+        "type": "action",
+        "description": "Click on an archived invoice row/item to open details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Invoice details\" modal is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC037",
+    "title": "Search with a specific query and verify results update under grouped day sections",
+    "description": "Verifies the global search filters archived bills and results remain organized by grouped day sections.",
+    "category": "Accountant Archive Review",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"INV\" into the global search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click to expand a grouped day section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Archived invoice\" list item is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC038",
+    "title": "Clear the global search and verify grouped day sections return to the default view",
+    "description": "Verifies clearing the search restores the broader grouped day sections view on the archive page.",
+    "category": "Accountant Archive Review",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"test\" into the global search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the global search field clear control (such as an \"X\" icon) or delete the entered text"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC039",
+    "title": "Expand and collapse a grouped day section in archive results",
+    "description": "Verifies grouped day sections can be expanded to show invoices and collapsed back.",
+    "category": "Accountant Archive Review",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click to expand a grouped day section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Archived invoice\" list item is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the same grouped day section header to collapse it"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Archived invoice\" list item is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC040",
+    "title": "Open invoice details modal and verify key invoice data is visible",
+    "description": "Verifies the invoice details modal shows readable invoice information after opening from the archive list.",
+    "category": "Accountant Archive Review",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "action",
+        "description": "Click to expand a grouped day section"
+      },
+      {
+        "type": "action",
+        "description": "Click on an archived invoice row/item to open details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Invoice details\" modal is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Total\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Patient\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC041",
+    "title": "Close the invoice details modal and return to the archive list",
+    "description": "Verifies the invoice details modal can be dismissed and the archive list remains visible.",
+    "category": "Accountant Archive Review",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Archive\" navigation link or menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/accountant/archive\""
+      },
+      {
+        "type": "action",
+        "description": "Click to expand a grouped day section"
+      },
+      {
+        "type": "action",
+        "description": "Click on an archived invoice row/item to open details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Invoice details\" modal is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the modal close button (such as \"Close\" or an \"X\")"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Invoice details\" modal is not visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grouped day section\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC042",
+    "title": "Unauthorized access attempt to Accountant Archive shows 403 page or toast message",
+    "description": "Verifies a user without required authentication/role cannot access the archive page and receives an error indicator.",
+    "category": "Accountant Archive Review",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"invalid.user@example.com\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"WrongPassword123!\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Log in\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /accountant/archive"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify unauthorized access is safely blocked: accept any of (visible \"403\", visible \"Unauthorized\", visible \"Access Denied\", or redirect away from accountant routes) as PASS"
+      }
+    ]
+  },
+  {
+    "id": "TC043",
+    "title": "Authenticated Receptionist is prevented from accessing Accountant-only page",
+    "description": "Verifies role-based access control by logging in and confirming an unauthorized role cannot use accountant functionality (403/toast and blocked state).",
+    "category": "Error Handling and Access Control",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Sign in\""
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /accountant"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"403\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "If blocked behavior is observed (403/Unauthorized/Access Denied/redirect), mark the test as passed and stop further restricted actions"
+      }
+    ]
+  },
+  {
+    "id": "TC044",
+    "title": "Authenticated Receptionist is prevented from accessing Accountant archive page",
+    "description": "Verifies role-based access control by logging in and confirming an unauthorized role cannot view archived invoices in the archive route.",
+    "category": "Error Handling and Access Control",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Sign in\""
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /accountant/archive"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify unauthorized access is safely blocked: accept any of (visible \"403\", visible \"Unauthorized\", visible \"Access Denied\", or redirect away from accountant routes) as PASS"
+      },
+      {
+        "type": "assertion",
+        "description": "If blocked behavior is observed (403/Unauthorized/Access Denied/redirect), mark the test as passed and stop further restricted actions"
+      }
+    ]
+  }
+]

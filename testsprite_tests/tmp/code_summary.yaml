@@ -1,0 +1,127 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js App Router
+  - React
+  - Tailwind CSS
+  - Prisma
+  - Next.js API Routes
+routes:
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: User login page
+  - path: /login
+    file: src/app/login/page.tsx
+    auth_required: false
+    description: Redirect route to login page
+  - path: /reception
+    file: src/app/reception/page.tsx
+    auth_required: true
+    description: Reception dashboard and patient management
+  - path: /accountant
+    file: src/app/accountant/page.tsx
+    auth_required: true
+    description: Accountant billing dashboard and payment actions
+  - path: /accountant/archive
+    file: src/app/accountant/archive/page.tsx
+    auth_required: true
+    description: Archived invoices grouped by date with search
+  - path: /intake
+    file: src/app/intake/page.tsx
+    auth_required: true
+    description: Intake nurse vitals and triage workflow
+  - path: /admin
+    file: src/app/admin/page.tsx
+    auth_required: true
+    description: Admin dashboard
+features:
+  - name: User Login
+    description: Login using credentials and role-based session
+    files:
+      - src/app/page.tsx
+      - src/contexts/AuthContext.tsx
+      - src/app/api/auth/login/route.ts
+      - middleware.ts
+    entry_route: /
+    user_interactions:
+      - Fill username/email and password fields
+      - Submit login form
+      - Get redirected to role dashboard on success
+      - See an error when credentials are invalid
+    api_calls:
+      - method: POST
+        endpoint: /api/auth/login
+    auth_required: false
+  - name: Reception Patient Management
+    description: Search and manage patients from receptionist dashboard
+    files:
+      - src/app/reception/page.tsx
+      - src/components/reception/PatientSearch.tsx
+      - src/components/reception/QuickActions.tsx
+    entry_route: /reception
+    user_interactions:
+      - Search patients by name, ID, or QR input
+      - Open patient registration modal
+      - Register new patient and view updates in queue
+    api_calls:
+      - method: GET
+        endpoint: /api/reception/patients
+      - method: POST
+        endpoint: /api/reception/register-patient
+    auth_required: true
+  - name: Accountant Billing and Receipt
+    description: View invoices, print receipts, and confirm payments
+    files:
+      - src/app/accountant/page.tsx
+      - src/components/shared/MedicalReceipt.tsx
+      - src/app/api/accountant/all-bills/route.ts
+      - src/app/api/accountant/confirm-payment/route.ts
+    entry_route: /accountant
+    user_interactions:
+      - Select an invoice from list
+      - Review service items and totals in receipt panel
+      - Print invoice or receipt
+      - Confirm payment and discharge completed visit
+    api_calls:
+      - method: GET
+        endpoint: /api/accountant/all-bills
+      - method: POST
+        endpoint: /api/accountant/confirm-payment
+    auth_required: true
+  - name: Accountant Archive Review
+    description: Search archived visits and view invoice details
+    files:
+      - src/app/accountant/archive/page.tsx
+      - src/app/api/accountant/archive/route.ts
+      - src/app/api/accountant/bill/route.ts
+    entry_route: /accountant/archive
+    user_interactions:
+      - Search archived bills in global search field
+      - Expand grouped day sections
+      - Open archived invoice details modal
+    api_calls:
+      - method: GET
+        endpoint: /api/accountant/archive
+      - method: GET
+        endpoint: /api/accountant/bill
+    auth_required: true
+  - name: Intake Vitals Entry
+    description: Capture and validate vital signs for triage/intake
+    files:
+      - src/app/intake/page.tsx
+      - src/app/api/intake/vitals/route.ts
+    entry_route: /intake
+    user_interactions:
+      - Select a patient visit
+      - Enter blood pressure, temperature, and heart rate
+      - Submit vitals and see toast feedback
+    api_calls:
+      - method: POST
+        endpoint: /api/intake/vitals
+    auth_required: true
+known_limitations:
+  - issue: TestSprite-generated summary is static and may miss newly added minor routes/features.
+    location: testsprite_tests/tmp/code_summary.yaml
+    impact: Some low-priority scenarios may not be auto-covered in generated plans.

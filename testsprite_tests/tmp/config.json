@@ -1,0 +1,20 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "reception@zionmed.com",
+  "loginPassword": "reception123",
+  "executionArgs": {
+    "projectName": "HMSPRO",
+    "projectPath": "C:\\ZION_PROJECT\\HMSPRO",
+    "testIds": [],
+    "additionalInstruction": "Final run after deterministic seeding. Prioritize intake vitals flow and unauthorized access checks. Use current updated test plan expectations.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-R6Os1LrXcEPWTTAu8MxqPHihhw09bKEhppdAj8cxjKEkFjmh1qnRVoCvhL5KMp8zBPCfwKiuvX9ec-1tcJFlV4wF23sRJaEl7uAMk9ZyQ-XgWHhtUuat8a_IfF-f7hxSx30"
+    }
+  },
+  "serverPort": 58160,
+  "proxy": "http://e911afa9-56de-4638-8ba1-95bc6e968c98:svSYviK9HndmV7DGFvrLX3IfvgMLHsru@tun.testsprite.com:8080"
+}
