@@ -41,7 +41,7 @@ const workflow = [
 
 export default function LandingPage() {
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#030712] text-white">
+    <main className="relative min-h-screen scroll-smooth overflow-x-hidden bg-[#030712] text-white">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-32 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[120px]" />
         <div className="absolute right-0 top-1/3 h-72 w-72 rounded-full bg-cyan-500/20 blur-[120px]" />
@@ -84,13 +84,6 @@ export default function LandingPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400"
             >
               Request Demo
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-500/20"
-            >
-              Get Pricing
               <ChevronRight className="h-4 w-4" />
             </Link>
             <Link
@@ -167,26 +160,12 @@ export default function LandingPage() {
                 Monitor occupancy, diagnostic throughput, doctor queues, and revenue performance from
                 a single executive dashboard designed for hospital owners and directors.
               </p>
-              <Link
-                href="/login"
-                className="mt-7 inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-cyan-950 transition hover:bg-cyan-400"
-              >
-                Book Your Demo
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-7 flex flex-wrap gap-2">
                 <Link
                   href="/login"
                   className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-500/20"
                 >
                   Get Pricing
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-4 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-500/20"
-                >
-                  View Live Demo
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
