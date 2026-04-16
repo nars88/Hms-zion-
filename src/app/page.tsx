@@ -88,17 +88,24 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-500/20"
+            >
+              Get Started
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/login"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-6 py-3 text-sm font-semibold text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-500/20"
             >
               View Live Demo
               <ChevronRight className="h-4 w-4" />
             </Link>
-            <a
+            <Link
               href="#workflow"
               className="rounded-xl border border-slate-700 bg-slate-900/70 px-6 py-3 text-sm font-medium text-slate-200 transition hover:border-slate-500"
             >
               See Workflow
-            </a>
+            </Link>
           </div>
         </section>
 
