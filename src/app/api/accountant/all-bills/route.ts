@@ -1,13 +1,23 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { unstable_noStore as noStore } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 // GET /api/accountant/all-bills
 // Returns all visits that have a bill (including ER pending: Waiting/In_Consultation with bill)
 export async function GET() {
+  noStore()
+  // Next may invoke handlers during `next build`; avoid DB I/O on Vercel build workers (env/Prisma engine edge cases).
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return NextResponse.json({ success: true, bills: [] })
+  }
   try {
+    const [{ prisma }, { VisitStatus }] = await Promise.all([
+      import('@/lib/prisma'),
+      import('@prisma/client'),
+    ])
+
     // Active queue: exclude Discharged and COMPLETED (archived visits are on /accountant/archive)
     const visits = await prisma.visit.findMany({
       where: {

@@ -7,6 +7,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    // Prisma uses native binaries; bundling it breaks Vercel builds ("Failed to collect page data" / engine errors).
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
   // Disable file system caching for development (helps with OneDrive)
   onDemandEntries: {
