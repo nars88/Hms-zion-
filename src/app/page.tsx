@@ -100,12 +100,12 @@ export default function LandingPage() {
               View Live Demo
               <ChevronRight className="h-4 w-4" />
             </Link>
-            <Link
+            <a
               href="#workflow"
               className="rounded-xl border border-slate-700 bg-slate-900/70 px-6 py-3 text-sm font-medium text-slate-200 transition hover:border-slate-500"
             >
               See Workflow
-            </Link>
+            </a>
           </div>
         </section>
 
