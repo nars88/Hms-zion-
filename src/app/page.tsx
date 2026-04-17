@@ -27,10 +27,11 @@ export default function LandingPage() {
             <Link href="/login" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
               Pricing
             </Link>
-            <Link href="/login">
-              <button className="px-5 py-2.5 bg-white text-black text-sm font-bold rounded-full hover:bg-emerald-500 hover:text-white transition-all duration-300">
-                Login
-              </button>
+            <Link
+              href="/login"
+              className="px-5 py-2.5 bg-white text-black text-sm font-bold rounded-full hover:bg-emerald-500 hover:text-white transition-all duration-300"
+            >
+              Login
             </Link>
           </div>
         </div>
@@ -59,10 +60,11 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/login">
-              <button className="w-full sm:w-auto px-8 py-4 bg-emerald-500 text-black font-bold rounded-2xl hover:bg-emerald-400 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20">
-                Get Started Now <ArrowRight size={20} />
-              </button>
+            <Link
+              href="/login"
+              className="w-full sm:w-auto px-8 py-4 bg-emerald-500 text-black font-bold rounded-2xl hover:bg-emerald-400 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20"
+            >
+              Get Started Now <ArrowRight size={20} />
             </Link>
             <a href="#workflow" className="w-full sm:w-auto px-8 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 transition-all duration-300">
               See Workflow
@@ -94,10 +96,11 @@ export default function LandingPage() {
           </div>
           
           <div className="mt-16 text-center">
-            <Link href="/login">
-              <button className="px-8 py-4 bg-white text-black font-bold rounded-2xl hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-xl">
-                View Live Demo →
-              </button>
+            <Link
+              href="/login"
+              className="px-8 py-4 bg-white text-black font-bold rounded-2xl hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-xl inline-block"
+            >
+              View Live Demo →
             </Link>
           </div>
         </div>
