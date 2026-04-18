@@ -23,8 +23,8 @@ export default function LandingPage() {
           <a href="#contact" className="hidden sm:block text-sm text-slate-400 hover:text-white transition-colors">
             Contact
           </a>
-          <Link href="/login">
-            <button className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-black text-sm font-black transition-all">
+          <Link href="/login" prefetch={false}>
+            <button type="button" className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-black text-sm font-black transition-all">
               Login {'\u2192'}
             </button>
           </Link>
@@ -48,8 +48,8 @@ export default function LandingPage() {
           platform.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Link href="/login">
-            <button className="px-8 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black font-black text-sm transition-all shadow-[0_0_32px_rgba(6,182,212,0.4)]">
+          <Link href="/login" prefetch={false}>
+            <button type="button" className="px-8 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black font-black text-sm transition-all shadow-[0_0_32px_rgba(6,182,212,0.4)]">
               Get Started {'\u2192'}
             </button>
           </Link>
@@ -275,8 +275,8 @@ export default function LandingPage() {
       <section className="py-28 px-6 text-center max-w-3xl mx-auto">
         <h2 className="text-4xl font-black text-white mb-6">Ready to Transform Your Hospital?</h2>
         <p className="text-slate-400 mb-10 text-lg">Join the next generation of hospital management.</p>
-        <Link href="/login">
-          <button className="px-12 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black font-black text-base transition-all shadow-[0_0_40px_rgba(6,182,212,0.4)]">
+        <Link href="/login" prefetch={false}>
+          <button type="button" className="px-12 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black font-black text-base transition-all shadow-[0_0_40px_rgba(6,182,212,0.4)]">
             Start Now {'\u2192'}
           </button>
         </Link>
