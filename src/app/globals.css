@@ -40,7 +40,6 @@ html {
 html {
   max-width: 100vw;
   overflow-x: hidden;
-  scroll-behavior: smooth;
   background-color: #F1F5F9;
   color: var(--text-primary);
   border: none;
