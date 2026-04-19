@@ -6,11 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import SmartSidebar from '@/components/shared/SmartSidebar'
 import BackButton from '@/components/BackButton'
 import { USER_ROLES } from '@/contexts/AuthContext'
-import {
-  DEMO_RADIOLOGY_XRAY_IMAGE_URL,
-  DEMO_SONAR_ULTRASOUND_IMAGE_URL,
-  normalizeExternalImageUrl,
-} from '@/config/demoDiagnosticImageUrls'
+import { normalizeExternalImageUrl } from '@/config/demoDiagnosticImageUrls'
 import { Image, Printer, X } from 'lucide-react'
 // MANDATORY SAFETY CHECK: CONFIRMATION MODAL.
 
@@ -97,7 +93,6 @@ export default function RadiologyDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [isListening, setIsListening] = useState(true)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const visibleRequests = useMemo(() => {
@@ -151,63 +146,11 @@ export default function RadiologyDashboard() {
     fetchRequests()
   }, [fetchRequests])
 
-  // Silent refresh so simulator DB updates appear without flicker.
+  // Periodic refresh for queue updates.
   useEffect(() => {
     const interval = setInterval(() => {
       fetchRequests(true)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [fetchRequests])
-
-  useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return
-    const bc = new BroadcastChannel('zion-diagnostic')
-    bc.onmessage = (ev: MessageEvent) => {
-      const d = ev.data as { type?: string; department?: string }
-      if (
-        d?.type === 'simulate-success' &&
-        (d.department === 'Radiology' || d.department === 'Sonar' || d.department === 'ECG')
-      ) {
-        fetchRequests(true)
-      }
-    }
-    return () => bc.close()
-  }, [fetchRequests])
-
-  useEffect(() => {
-    const pollAutoIngest = async () => {
-      try {
-        const [radRes, sonarRes, ecgRes] = await Promise.all([
-          fetch('/api/diagnostic/auto-ingest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ department: 'Radiology' }),
-          }),
-          fetch('/api/diagnostic/auto-ingest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ department: 'Sonar' }),
-          }),
-          fetch('/api/diagnostic/auto-ingest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ department: 'ECG' }),
-          }),
-        ])
-        const rad = (await radRes.json().catch(() => ({}))) as { ingested?: boolean }
-        const sonar = (await sonarRes.json().catch(() => ({}))) as { ingested?: boolean }
-        const ecg = (await ecgRes.json().catch(() => ({}))) as { ingested?: boolean }
-        if (rad.ingested || sonar.ingested || ecg.ingested) {
-          showSuccessToast()
-          await fetchRequests(true)
-        }
-        setIsListening(true)
-      } catch (_) {
-        setIsListening(false)
-      }
-    }
-    pollAutoIngest()
-    const interval = setInterval(pollAutoIngest, 5000)
+    }, 30000)
     return () => clearInterval(interval)
   }, [fetchRequests])
 
@@ -223,51 +166,9 @@ export default function RadiologyDashboard() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2200)
   }
 
-  const simulateAutoImport = async () => {
-    const firstPending = requests.find((r) => r.status === 'Pending')
-    if (!firstPending) {
-      setToast('No pending imaging requests.')
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = setTimeout(() => setToast(null), 1800)
-      return
-    }
-    const demoImage =
-      firstPending.tab === 'X-Ray'
-        ? DEMO_RADIOLOGY_XRAY_IMAGE_URL
-        : DEMO_SONAR_ULTRASOUND_IMAGE_URL
-
+  const handleUploadResult = async (row: ImagingRequest, file: File) => {
     try {
-      const resultRes = await fetch('/api/lab/er-beds/result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitId: firstPending.visitId,
-          at: firstPending.at,
-          testType: firstPending.requestType,
-          result: `Auto-imported ${firstPending.tab} result.`,
-          department: firstPending.department,
-          attachmentPath: demoImage,
-        }),
-      })
-      const resultJson = (await resultRes.json().catch(() => ({}))) as { error?: string }
-      if (!resultRes.ok) throw new Error(resultJson.error || 'Auto-import failed')
-
-      await fetchRequests(true)
-      showSuccessToast('Image captured — open Review & Submit to send to the doctor.')
-    } catch (err) {
-      setError((err as Error)?.message || 'Auto-import failed')
-    }
-  }
-
-  const handleUploadResult = async (row: ImagingRequest, file?: File | null) => {
-    try {
-      let attachmentPath: string | undefined
-      if (file) {
-        attachmentPath = await readFileAsDataUrl(file)
-      } else {
-        attachmentPath =
-          row.tab === 'X-Ray' ? DEMO_RADIOLOGY_XRAY_IMAGE_URL : DEMO_SONAR_ULTRASOUND_IMAGE_URL
-      }
+      const attachmentPath = await readFileAsDataUrl(file)
       const resultRes = await fetch('/api/lab/er-beds/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -423,18 +324,7 @@ export default function RadiologyDashboard() {
                 <div>
                   <h1 className="text-lg font-semibold text-slate-100">ZION Hospital - Diagnostic Imaging</h1>
                   <p className="text-xs text-slate-400">Radiology and Ultrasound queue</p>
-                  <p className={`text-xs mt-1 ${isListening ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    Status: Listening for devices...
-                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={simulateAutoImport}
-                  className="opacity-0 pointer-events-auto h-0 w-0 overflow-hidden"
-                  aria-label="Auto Process"
-                >
-                  Auto-Process
-                </button>
               </div>
               <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-2 inline-flex gap-2">
                 <button
@@ -594,14 +484,6 @@ export default function RadiologyDashboard() {
                                       />
                                       Upload image
                                     </label>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleUploadResult(item, null)}
-                                      className="px-2 py-1.5 rounded-md bg-slate-700/80 border border-slate-600 text-slate-300 text-xs font-medium hover:bg-slate-600/80"
-                                      title="Attach demo image for testing"
-                                    >
-                                      Demo image
-                                    </button>
                                   </div>
                                 )}
                                 <button

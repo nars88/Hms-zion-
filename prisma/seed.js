@@ -1,6 +1,25 @@
 const { PrismaClient } = require('@prisma/client')
+const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
+
+/** Always reset so doctor@zion.med / doc123 works even if DB had wrong password. */
+const ZION_MED_DEMO_ACCOUNTS = [
+  {
+    email: 'doctor@zion.med',
+    plainPassword: 'doc123',
+    name: 'ER Doctor (Test)',
+    role: 'DOCTOR',
+    phone: '+964 750 000 0011',
+  },
+  {
+    email: 'nurse@zion.med',
+    plainPassword: 'nurse123',
+    name: 'ER Nurse (Test)',
+    role: 'ER_NURSE',
+    phone: '+964 750 000 0010',
+  },
+]
 
 async function main() {
   console.log('🌱 Seeding test users...')
@@ -124,6 +143,31 @@ async function main() {
       }
     } catch (error) {
       console.error(`❌ Error creating user ${user.email}:`, error)
+    }
+  }
+
+  for (const acc of ZION_MED_DEMO_ACCOUNTS) {
+    try {
+      const password = await bcrypt.hash(acc.plainPassword, 12)
+      await prisma.user.upsert({
+        where: { email: acc.email },
+        create: {
+          email: acc.email,
+          password,
+          name: acc.name,
+          role: acc.role,
+          phone: acc.phone,
+        },
+        update: {
+          password,
+          name: acc.name,
+          role: acc.role,
+          phone: acc.phone,
+        },
+      })
+      console.log(`✅ Demo account ready: ${acc.email}`)
+    } catch (error) {
+      console.error(`❌ Error upserting ${acc.email}:`, error)
     }
   }
 

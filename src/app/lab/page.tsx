@@ -35,16 +35,14 @@ type BedRow = {
   labRequests: ApiLabRequest[]
 }
 
-const AUTO_LAB_RESULT = 'Blood Test: Hemoglobin 14.5 g/dL, WBC 7000 /uL'
-
 export default function LabTechDashboard() {
   const [requests, setRequests] = useState<LabRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [isListening, setIsListening] = useState(true)
   const [confirmRow, setConfirmRow] = useState<LabRequest | null>(null)
+  const [confirmFile, setConfirmFile] = useState<File | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmNotes, setConfirmNotes] = useState('')
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,41 +85,6 @@ export default function LabTechDashboard() {
   }, [fetchRequests])
 
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return
-    const bc = new BroadcastChannel('zion-diagnostic')
-    bc.onmessage = (ev: MessageEvent) => {
-      const d = ev.data as { type?: string; department?: string }
-      if (d?.type === 'simulate-success' && d.department === 'Lab') {
-        void fetchRequests(true)
-      }
-    }
-    return () => bc.close()
-  }, [fetchRequests])
-
-  useEffect(() => {
-    const pollAutoIngest = async () => {
-      try {
-        const res = await fetch('/api/diagnostic/auto-ingest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ department: 'Lab' }),
-        })
-        const data = (await res.json().catch(() => ({}))) as { ingested?: boolean }
-        if (data.ingested) {
-          showSuccessToast()
-          await fetchRequests(true)
-        }
-        setIsListening(true)
-      } catch (_) {
-        setIsListening(false)
-      }
-    }
-    pollAutoIngest()
-    const interval = setInterval(pollAutoIngest, 5000)
-    return () => clearInterval(interval)
-  }, [fetchRequests])
-
-  useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     }
@@ -145,56 +108,63 @@ export default function LabTechDashboard() {
     }, 220)
   }
 
-  const completeLabRequest = async (row: LabRequest, resultText: string, technicianNotes?: string) => {
+  const handleUploadLabResult = async (row: LabRequest, file: File, technicianNotes?: string) => {
     try {
-      if (!row.id.startsWith('MOCK-')) {
-        const res = await fetch('/api/lab/er-beds/result', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            visitId: row.visitId,
-            at: row.at,
-            testType: row.testType,
-            result: resultText,
-            department: 'Lab',
-            technicianNotes: technicianNotes?.trim() || undefined,
-          }),
+      let resultText = ''
+      let attachmentPath: string | undefined
+
+      if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+        attachmentPath = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result))
+          reader.onerror = () => reject(new Error('Could not read file'))
+          reader.readAsDataURL(file)
         })
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
-        if (!res.ok) throw new Error(data.error || 'Failed to save result')
+        resultText = `Lab result uploaded: ${file.name}`
+      } else {
+        resultText = await file.text()
+        if (!resultText.trim()) {
+          setError('File is empty')
+          return
+        }
       }
-      setRequests((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, status: 'Completed', result: resultText } : r))
-      )
+
+      const res = await fetch('/api/lab/er-beds/result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitId: row.visitId,
+          at: row.at,
+          testType: row.testType,
+          result: resultText,
+          department: 'Lab',
+          attachmentPath,
+          technicianNotes: technicianNotes?.trim() || undefined,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(data.error || 'Failed to save result')
+
       showSuccessToast()
       removeRowWithAnimation(row.id)
+      await fetchRequests(true)
     } catch (err) {
-      setError((err as Error)?.message || 'Failed to process request')
+      setError((err as Error)?.message || 'Failed to upload result')
     }
   }
 
   // MANDATORY SAFETY CHECK: CONFIRMATION MODAL.
-  const requestFinalizeWithConfirmation = (row: LabRequest) => {
-    setConfirmRow(row)
-    setConfirmNotes('')
-  }
-
   const confirmFinalize = async () => {
-    if (!confirmRow) return
+    if (!confirmRow || !confirmFile) return
     setConfirmBusy(true)
     try {
-      await completeLabRequest(confirmRow, AUTO_LAB_RESULT, confirmNotes)
+      await handleUploadLabResult(confirmRow, confirmFile, confirmNotes)
       setConfirmRow(null)
+      setConfirmFile(null)
       setConfirmNotes('')
     } finally {
       setConfirmBusy(false)
     }
-  }
-
-  const simulateAutoImport = async () => {
-    const firstPending = requests.find((r) => r.status === 'Pending')
-    if (!firstPending) return
-    await completeLabRequest(firstPending, AUTO_LAB_RESULT)
   }
 
   const handlePrint = (row: LabRequest) => {
@@ -225,7 +195,7 @@ export default function LabTechDashboard() {
           <div><strong>Visit ID:</strong> ${row.visitId}</div>
           <div><strong>Test:</strong> ${row.testType}</div>
         </div>
-        <div class="result">${row.result || AUTO_LAB_RESULT}</div>
+        <div class="result">${row.result || '—'}</div>
         <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); };</script>
       </body>
       </html>
@@ -246,18 +216,7 @@ export default function LabTechDashboard() {
                 <div>
                   <h1 className="text-lg font-semibold text-slate-100">ZION Hospital - Laboratory</h1>
                   <p className="text-xs text-slate-400">Compact pending lab queue</p>
-                  <p className={`text-xs mt-1 ${isListening ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    Status: Listening for devices...
-                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={simulateAutoImport}
-                  className="opacity-0 pointer-events-auto h-0 w-0 overflow-hidden"
-                  aria-label="Auto Process"
-                >
-                  Auto-Process
-                </button>
               </div>
 
               <section className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-3">
@@ -309,13 +268,23 @@ export default function LabTechDashboard() {
                           </td>
                           <td className="py-2 px-2">
                             <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => requestFinalizeWithConfirmation(row)}
-                                className="px-2.5 py-1.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium hover:bg-emerald-500/30"
-                              >
-                                Auto-Import
-                              </button>
+                              <label className="px-2.5 py-1.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium hover:bg-emerald-500/30 cursor-pointer inline-block">
+                                <input
+                                  type="file"
+                                  accept=".txt,.csv,.pdf,image/*"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0]
+                                    e.target.value = ''
+                                    if (f) {
+                                      setConfirmFile(f)
+                                      setConfirmRow(row)
+                                      setConfirmNotes('')
+                                    }
+                                  }}
+                                />
+                                Upload Result
+                              </label>
                               <button
                                 type="button"
                                 onClick={() => handlePrint(row)}
@@ -344,7 +313,14 @@ export default function LabTechDashboard() {
       {confirmRow && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-2xl border border-emerald-500/35 bg-slate-900/95 p-5 shadow-[0_0_24px_rgba(16,185,129,0.25)]">
-            <h3 className="text-base font-semibold text-slate-100">Confirm Final Results - Laboratory</h3>
+            <h3 className="text-base font-semibold text-slate-100">
+              Confirm Final Results - Laboratory
+              {confirmFile ? (
+                <span className="block mt-1 text-sm font-normal text-slate-400 truncate" title={confirmFile.name}>
+                  {confirmFile.name}
+                </span>
+              ) : null}
+            </h3>
             <p className="mt-2 text-sm text-slate-300">
               Are you sure you want to finalize these results for <span className="font-semibold">{confirmRow.patientName}</span>? This will send the data directly to the doctor&apos;s dashboard.
             </p>
@@ -363,7 +339,7 @@ export default function LabTechDashboard() {
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-slate-400">Result</td>
-                      <td className="px-3 py-2 text-slate-100">{AUTO_LAB_RESULT}</td>
+                      <td className="px-3 py-2 text-slate-100">{confirmFile?.name ?? '—'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -388,6 +364,7 @@ export default function LabTechDashboard() {
                 disabled={confirmBusy}
                 onClick={() => {
                   setConfirmRow(null)
+                  setConfirmFile(null)
                   setConfirmNotes('')
                 }}
                 className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
