@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,10 @@ export async function GET() {
 // Creates or updates a price setting
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     const body = await request.json()
     const { serviceType, serviceName, category, price, updatedBy } = body
 

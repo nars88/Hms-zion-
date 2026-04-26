@@ -6,12 +6,12 @@ import { orderHasReleasedImagingResult } from '@/lib/imagingRelease'
 export const dynamic = 'force-dynamic'
 
 // GET /api/emergency/patients
-// Returns all ER patients (chiefComplaint contains Emergency/ER), any status except Discharged
+// Returns active ER patients (not discharged / not completed — finished visits leave the board)
 export async function GET() {
   try {
     const visits = await prisma.visit.findMany({
       where: {
-        status: { not: VisitStatus.Discharged },
+        status: { notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED] },
         OR: [
           { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
           { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
@@ -23,6 +23,7 @@ export async function GET() {
         patientId: true,
         chiefComplaint: true,
         status: true,
+        bedNumber: true,
         notes: true,
         patient: {
           select: {
@@ -51,22 +52,35 @@ export async function GET() {
       const latestVitals = v.vitals[0]
       const patientId = p?.id ?? v.patientId
       const name = p ? `${p.firstName} ${p.lastName}`.trim() : 'Patient info missing'
-      let erOrders: Array<{ type: string; content?: string; at: string; status?: string }> = []
+      let erOrders: Array<{
+        type: string
+        content?: string
+        at: string
+        status?: string
+        assigneeUserId?: string
+      }> = []
+      let nurseTasksPending = false
+      let nurseTasksComplete = false
       let doctorMedications = ''
       let doctorLabTests = ''
       let labReady = false
       let radiologyReady = false
       let sonarReady = false
+      let ecgReady = false
       let hasLabRequest = false
       let hasRadiologyRequest = false
       let hasSonarRequest = false
+      let hasEcgRequest = false
       let hasPendingDiagnostics = false
       let labDiagnostic: { summary: string; attachmentPath?: string } | null = null
       let radiologyDiagnostic: { summary: string; attachmentPath?: string; technicianNotes?: string } | null = null
       let sonarDiagnostic: { summary: string; attachmentPath?: string; technicianNotes?: string } | null = null
+      let ecgDiagnostic: { summary: string; attachmentPath?: string; technicianNotes?: string } | null = null
       let labUnreviewed = false
       let radiologyUnreviewed = false
       let sonarUnreviewed = false
+      let ecgUnreviewed = false
+      let criticalAlert = false
       try {
         const notesJson = (v as { notes?: string | null }).notes
         if (notesJson && typeof notesJson === 'string') {
@@ -91,18 +105,38 @@ export async function GET() {
               releasedToDoctorAt?: string
               technicianNotes?: string
             }>
-            lastResultAt?: { Lab?: string; Radiology?: string; Sonar?: string }
-            lastReviewedAt?: { Lab?: string; Radiology?: string; Sonar?: string }
+            ecgResults?: Array<{
+              at?: string
+              testType?: string
+              result?: string
+              attachmentPath?: string
+              releasedToDoctorAt?: string
+              technicianNotes?: string
+            }>
+            lastResultAt?: { Lab?: string; Radiology?: string; Sonar?: string; ECG?: string }
+            lastReviewedAt?: { Lab?: string; Radiology?: string; Sonar?: string; ECG?: string }
+            erCriticalAlert?: boolean
+            erCriticalAlertAt?: string
           }
-          if (parsed.erOrders) erOrders = parsed.erOrders
+          criticalAlert = Boolean(parsed.erCriticalAlert || parsed.erCriticalAlertAt)
+          if (parsed.erOrders) erOrders = parsed.erOrders as typeof erOrders
+          const nurseOrders = erOrders.filter((o) => o.type === 'NURSE_TASK')
+          if (nurseOrders.length > 0) {
+            nurseTasksPending = nurseOrders.some(
+              (o) => !o.status || o.status === 'TASK_PENDING' || o.status === 'PENDING'
+            )
+            nurseTasksComplete = !nurseTasksPending && nurseOrders.every((o) => o.status === 'DONE')
+          }
           if (parsed.doctorMedications) doctorMedications = parsed.doctorMedications
           if (parsed.doctorLabTests) doctorLabTests = parsed.doctorLabTests
           const labOrders = (parsed.erOrders || []).filter((o: { type: string }) => o.type === 'LAB' || o.type === 'LAB_REQUESTED')
           const radiologyOrders = (parsed.erOrders || []).filter((o: { type: string }) => o.type === 'RADIOLOGY_REQUESTED')
           const sonarOrders = (parsed.erOrders || []).filter((o: { type: string }) => o.type === 'SONAR_REQUESTED')
+          const ecgOrders = (parsed.erOrders || []).filter((o: { type: string }) => o.type === 'ECG_REQUESTED')
           const labResults = parsed.labResults || []
           const radiologyResults = parsed.radiologyResults || []
           const sonarResults = parsed.sonarResults || []
+          const ecgResults = parsed.ecgResults || []
           if (labOrders.length > 0) {
             labReady = labOrders.every((o: { at: string }) => labResults.some((r: { at?: string }) => r.at === o.at))
             hasLabRequest = !labReady
@@ -145,10 +179,27 @@ export async function GET() {
               }
             }
           }
+          if (ecgOrders.length > 0) {
+            ecgReady = ecgOrders.every((o: { at: string }) => orderHasReleasedImagingResult(ecgResults, o.at))
+            hasEcgRequest = !ecgReady
+            const released = ecgResults.filter((r) => r.releasedToDoctorAt)
+            const last =
+              released.length > 0
+                ? released.reduce((a, b) => ((a.releasedToDoctorAt || '') > (b.releasedToDoctorAt || '') ? a : b))
+                : null
+            if (last) {
+              ecgDiagnostic = {
+                summary: last.result || '',
+                attachmentPath: last.attachmentPath,
+                technicianNotes: last.technicianNotes,
+              }
+            }
+          }
           hasPendingDiagnostics =
             (labOrders.length > 0 && !labReady) ||
             (radiologyOrders.length > 0 && !radiologyReady) ||
-            (sonarOrders.length > 0 && !sonarReady)
+            (sonarOrders.length > 0 && !sonarReady) ||
+            (ecgOrders.length > 0 && !ecgReady)
           // ER result alerts: unreviewed = has result and (never reviewed or new result after last review)
           const lastResultAt = parsed.lastResultAt || {}
           const lastReviewedAt = parsed.lastReviewedAt || {}
@@ -160,6 +211,9 @@ export async function GET() {
           }
           if (sonarReady && lastResultAt.Sonar) {
             sonarUnreviewed = !lastReviewedAt.Sonar || lastResultAt.Sonar > lastReviewedAt.Sonar
+          }
+          if (ecgReady && lastResultAt.ECG) {
+            ecgUnreviewed = !lastReviewedAt.ECG || lastResultAt.ECG > lastReviewedAt.ECG
           }
         }
       } catch (_) {}
@@ -173,13 +227,15 @@ export async function GET() {
         chiefComplaint: v.chiefComplaint ?? '',
         status: v.status,
         triageLevel: p?.triageLevel ?? null,
-        bedNumber: 'bedNumber' in v ? (v as { bedNumber?: number | null }).bedNumber ?? null : null,
+        bedNumber: v.bedNumber ?? null,
         labReady,
         radiologyReady,
         sonarReady,
+        ecgReady,
         hasLabRequest,
         hasRadiologyRequest,
         hasSonarRequest,
+        hasEcgRequest,
         hasPendingDiagnostics,
         billingStatus:
           (v as { status?: string }).status === 'Billing' && (v as { bill?: { paymentStatus: string } | null }).bill
@@ -190,21 +246,29 @@ export async function GET() {
         labDiagnostic,
         radiologyDiagnostic,
         sonarDiagnostic,
+        ecgDiagnostic,
         labUnreviewed,
         radiologyUnreviewed,
         sonarUnreviewed,
+        ecgUnreviewed,
         pharmacyOrderStatus: medOrderStatus,
         medicineReady: medOrderStatus === 'DISPENSED',
         pharmacyOutOfStock: medOrderStatus === 'OUT_OF_STOCK',
         doctorMedications,
         doctorLabTests,
         erOrders,
+        nurseTasksPending,
+        nurseTasksComplete,
+        criticalAlert,
         vitals: latestVitals
           ? {
               bp: latestVitals.bp,
               temperature: latestVitals.temperature,
               heartRate: latestVitals.heartRate,
               weight: latestVitals.weight,
+              spo2: (latestVitals as { spo2?: number | null }).spo2 ?? null,
+              recordingSource:
+                (latestVitals as { recordingSource?: string | null }).recordingSource ?? null,
             }
           : null,
       }

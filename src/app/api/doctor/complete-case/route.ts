@@ -44,6 +44,7 @@ export async function POST(request: Request) {
         finalDisposition: 'ARCHIVED',
         diagnosis: finalDiagnosis?.trim() || null,
         notes: updatedNotes,
+        dischargeDate: new Date(),
         updatedAt: new Date(),
       },
     })

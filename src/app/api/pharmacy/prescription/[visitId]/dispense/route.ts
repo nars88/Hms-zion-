@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { VisitStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { getMedicationAllergyConflicts } from '@/lib/pharmacySafety'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +45,22 @@ export async function POST(
       return NextResponse.json(
         { error: 'No prescription found for this visit' },
         { status: 400 }
+      )
+    }
+
+    const requestedMeds = Array.isArray(medicationPrices)
+      ? medicationPrices.map((med: { medicineName?: string }) => String(med?.medicineName || '').trim()).filter(Boolean)
+      : []
+    const allergyConflicts = getMedicationAllergyConflicts(requestedMeds, visit.patient?.allergies || null)
+    if (allergyConflicts.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Cannot dispense due to allergy conflict.',
+          status: 'Cannot dispense',
+          conflicts: allergyConflicts,
+          instruction: 'Verify with doctor',
+        },
+        { status: 409 }
       )
     }
 
@@ -101,14 +119,14 @@ export async function POST(
       },
     })
 
-    // Update visit status to indicate medication is ready
-    // We can add a new status or use notes field, for now we'll add a note
+    // Update visit status so patient appears in Accountant queue
     await prisma.visit.update({
       where: { id: visitId },
       data: {
+        status: VisitStatus.Billing,
         notes: visit.notes
-          ? `${visit.notes}\n[Pharmacy] Medications dispensed and ready for pickup at ${new Date().toISOString()}`
-          : `[Pharmacy] Medications dispensed and ready for pickup at ${new Date().toISOString()}`,
+          ? `${visit.notes}\n[Pharmacy] Medications dispensed and added to invoice at ${new Date().toISOString()}`
+          : `[Pharmacy] Medications dispensed and added to invoice at ${new Date().toISOString()}`,
         updatedAt: new Date(),
       },
     })

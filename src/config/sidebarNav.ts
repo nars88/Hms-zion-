@@ -16,10 +16,11 @@ export const ROLE_DASHBOARD_HREF: Record<string, string> = {
   DOCTOR: '/doctor/queue',
   PHARMACIST: '/pharmacy/dispense',
   RECEPTIONIST: '/reception',
-  ER_NURSE: '/emergency/nurse',
+  ER_INTAKE_NURSE: '/er/vitals-station',
+  ER_NURSE: '/er/mobile-tasks',
   INTAKE_NURSE: '/intake',
   SECURITY: '/gatekeeper',
-  SECRETARY: '/doctor/queue',
+  SECRETARY: '/secretary/clinic-queue',
   LAB_TECH: '/lab',
   RADIOLOGY_TECH: '/radiology',
 }
@@ -48,7 +49,8 @@ export const DEPARTMENT_NAV: Record<string, { roleLabel: string; items: Departme
   '/pharmacy': {
     roleLabel: 'Pharmacy',
     items: [
-      { href: '/pharmacy/dispense', label: 'Orders' },
+      { href: '/pharmacy/dispense', label: 'Orders Queue' },
+      { href: '/pharmacy/inventory', label: 'Inventory' },
     ],
   },
   '/lab': {
@@ -58,19 +60,6 @@ export const DEPARTMENT_NAV: Record<string, { roleLabel: string; items: Departme
   '/radiology': {
     roleLabel: 'Radiology',
     items: [{ href: '/radiology', label: 'Dashboard' }],
-  },
-  '/emergency/doctor': {
-    roleLabel: 'ER Doctor',
-    items: [
-      { href: '/emergency/doctor', label: 'Dashboard' },
-      { href: '/emergency/doctor#queue', label: 'Queue' },
-      { href: '/emergency/doctor#triage', label: 'Triage' },
-      { href: '/emergency/doctor#patients', label: 'Patients' },
-    ],
-  },
-  '/emergency/nurse': {
-    roleLabel: 'ER Nurse',
-    items: [{ href: '/emergency/nurse', label: 'Dashboard' }],
   },
   '/accountant': {
     roleLabel: 'Finance',
@@ -90,6 +79,10 @@ export const DEPARTMENT_NAV: Record<string, { roleLabel: string; items: Departme
   '/doctor': {
     roleLabel: 'Doctor',
     items: [{ href: '/doctor/queue', label: 'Queue' }],
+  },
+  '/secretary': {
+    roleLabel: 'Secretary',
+    items: [{ href: '/secretary/clinic-queue', label: 'Clinic Queue' }],
   },
   '/diagnostics': {
     roleLabel: 'Diagnostics',

@@ -46,8 +46,14 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json()
-    const { status, chiefComplaint, notes } = body
-    const data: { status?: VisitStatus; chiefComplaint?: string; notes?: string; updatedAt: Date } = { updatedAt: new Date() }
+    const { status, chiefComplaint, notes, bedNumber } = body
+    const data: {
+      status?: VisitStatus
+      chiefComplaint?: string
+      notes?: string
+      bedNumber?: number | null
+      updatedAt: Date
+    } = { updatedAt: new Date() }
     if (status !== undefined) {
       const valid = Object.values(VisitStatus).includes(status)
       if (!valid) return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
@@ -55,6 +61,12 @@ export async function PATCH(
     }
     if (chiefComplaint !== undefined) data.chiefComplaint = chiefComplaint
     if (notes !== undefined) data.notes = notes
+    if (bedNumber !== undefined) {
+      if (bedNumber !== null && (typeof bedNumber !== 'number' || !Number.isInteger(bedNumber) || bedNumber < 1)) {
+        return NextResponse.json({ error: 'bedNumber must be a positive integer or null' }, { status: 400 })
+      }
+      data.bedNumber = bedNumber
+    }
     const visit = await prisma.visit.update({
       where: { id: params.visitId },
       data,

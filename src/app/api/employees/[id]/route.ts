@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { syncUserDepartmentLink, verifyDepartmentExists } from '@/lib/departmentEmployeeSync'
+import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,10 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     const body = await request.json()
     const { email, password, name, role, specialization, education, departmentId } = body
     const updateData: {
@@ -140,6 +145,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     await syncUserDepartmentLink(params.id, null)
     await prisma.user.delete({ where: { id: params.id } })
     return NextResponse.json({ success: true })

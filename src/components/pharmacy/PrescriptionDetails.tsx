@@ -5,53 +5,11 @@ import { ArrowLeft, CheckCircle, Printer, Pill, AlertTriangle, AlertCircle, X, S
 import { useInventory } from '@/contexts/InventoryContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { printPharmacyDispensing } from '@/lib/printUtils'
+import { getMedicationAllergyConflicts } from '@/lib/pharmacySafety'
 
 interface PrescriptionDetailsProps {
   prescription: any
   onBack: () => void
-}
-
-// Helper function to check drug-allergy interactions
-// This is a simplified check - in production, use a comprehensive drug interaction database
-function checkDrugAllergyInteraction(
-  medicationName: string,
-  allergies: string | null
-): boolean {
-  if (!allergies || allergies.trim() === '' || allergies.trim().toLowerCase() === 'none') {
-    return false
-  }
-
-  const allergyLower = allergies.toLowerCase()
-  const medLower = medicationName.toLowerCase()
-
-  // Common drug-allergy patterns (simplified - expand with real database)
-  const interactionPatterns: Record<string, string[]> = {
-    penicillin: ['penicillin', 'amoxicillin', 'ampicillin', 'amoxiclav'],
-    sulfa: ['sulfa', 'sulfonamide', 'sulfamethoxazole', 'trimethoprim'],
-    aspirin: ['aspirin', 'salicylate', 'nsaid'],
-    ibuprofen: ['ibuprofen', 'nsaid', 'naproxen'],
-  }
-
-  // Check if medication contains any known allergen groups
-  for (const [allergenGroup, meds] of Object.entries(interactionPatterns)) {
-    if (allergyLower.includes(allergenGroup)) {
-      for (const med of meds) {
-        if (medLower.includes(med)) {
-          return true
-        }
-      }
-    }
-  }
-
-  // Simple substring match (fallback)
-  const allergyWords = allergyLower.split(/[,\s]+/).filter(w => w.length > 3)
-  for (const word of allergyWords) {
-    if (medLower.includes(word)) {
-      return true
-    }
-  }
-
-  return false
 }
 
 export default function PrescriptionDetails({ prescription, onBack }: PrescriptionDetailsProps) {
@@ -80,12 +38,8 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
           setPatientAllergies(data.allergies)
 
           // Check for drug-allergy interactions
-          const conflicts: string[] = []
-          prescription.items.forEach((item: any) => {
-            if (checkDrugAllergyInteraction(item.medicineName, data.allergies)) {
-              conflicts.push(item.medicineName)
-            }
-          })
+          const medicationNames = (prescription.items || []).map((item: any) => String(item.medicineName || ''))
+          const conflicts = getMedicationAllergyConflicts(medicationNames, data.allergies)
           setAllergyConflicts(conflicts)
           if (conflicts.length > 0) {
             setShowAllergyWarning(true)
@@ -104,15 +58,11 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
   const handleDispenseInternal = async () => {
     if (!user) return
 
-    // Safety check: Show warning if allergies conflict
-    if (allergyConflicts.length > 0 && !showAllergyWarning) {
-      const confirmed = window.confirm(
-        `⚠️ ALLERGY WARNING\n\nAre you sure you want to dispense?\n\nPatient is allergic to: ${patientAllergies}\n\nConflicting medications:\n${allergyConflicts.join('\n')}\n\nClick OK to proceed anyway, or Cancel to review.`
-      )
-      if (!confirmed) {
-        setShowAllergyWarning(true)
-        return
-      }
+    // Pharmacy-only hard stop on allergy conflicts
+    if (allergyConflicts.length > 0) {
+      setShowAllergyWarning(true)
+      alert('Cannot dispense. Verify with doctor.')
+      return
     }
 
     setIsProcessing(true)
@@ -169,15 +119,11 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
   const handleDispenseAndComplete = async () => {
     if (!user || !prescription) return
 
-    // Safety check: Show warning if allergies conflict
-    if (allergyConflicts.length > 0 && !showAllergyWarning) {
-      const confirmed = window.confirm(
-        `⚠️ ALLERGY WARNING\n\nAre you sure you want to dispense?\n\nPatient is allergic to: ${patientAllergies}\n\nConflicting medications:\n${allergyConflicts.join('\n')}\n\nClick OK to proceed anyway, or Cancel to review.`
-      )
-      if (!confirmed) {
-        setShowAllergyWarning(true)
-        return
-      }
+    // Pharmacy-only hard stop on allergy conflicts
+    if (allergyConflicts.length > 0) {
+      setShowAllergyWarning(true)
+      alert('Cannot dispense. Verify with doctor.')
+      return
     }
 
     setIsProcessing(true)
@@ -550,6 +496,12 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
                   </div>
                   {(prescription.status === 'PENDING' || prescription.status === 'OUT_OF_STOCK') && (
                     <>
+                      {allergyConflicts.length > 0 ? (
+                        <div className="rounded-xl border border-red-500/60 bg-red-500/10 px-4 py-3">
+                          <p className="text-sm font-bold text-red-300">Status: Cannot dispense</p>
+                          <p className="mt-1 text-xs text-red-200">Verify with doctor</p>
+                        </div>
+                      ) : null}
                       <label className="text-xs text-slate-400">Total cost (IQD) — added to visit invoice</label>
                       <input
                         type="number"
@@ -562,7 +514,7 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
                       />
                       <button
                         onClick={handleOrderDispense}
-                        disabled={isProcessing}
+                        disabled={isProcessing || allergyConflicts.length > 0}
                         className="w-full px-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <CheckCircle size={20} />}
@@ -583,7 +535,7 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
                 <>
                   <button
                     onClick={handleDispenseAndComplete}
-                    disabled={isProcessing}
+                    disabled={isProcessing || allergyConflicts.length > 0}
                     className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-2 border-emerald-400/50 rounded-2xl font-bold hover:from-emerald-600 hover:to-emerald-700 flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <CheckCircle size={20} />}

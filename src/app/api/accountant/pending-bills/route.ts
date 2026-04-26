@@ -8,45 +8,56 @@ export const dynamic = 'force-dynamic'
 // Returns all visits with COMPLETED status that have pending bills
 export async function GET() {
   try {
-    const visits = await prisma.visit.findMany({
+    const bills = await prisma.bill.findMany({
       where: {
-        status: VisitStatus.COMPLETED,
+        paymentStatus: 'Pending',
+        visit: {
+          status: VisitStatus.COMPLETED,
+        },
       },
-      include: {
+      select: {
+        id: true,
+        visitId: true,
+        patientId: true,
+        total: true,
+        paymentStatus: true,
+        qrStatus: true,
+        createdAt: true,
         patient: {
           select: {
-            id: true,
             firstName: true,
             lastName: true,
             phone: true,
           },
         },
-        bill: true,
-        doctor: {
+        visit: {
           select: {
             id: true,
-            name: true,
+            createdAt: true,
+            updatedAt: true,
+            doctor: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },
       orderBy: {
-        updatedAt: 'desc',
+        createdAt: 'desc',
       },
     })
 
-    // Filter to only include visits with pending bills
-    const pendingBills = visits
-      .filter((visit) => visit.bill && visit.bill.paymentStatus === 'Pending')
-      .map((visit) => ({
-        visitId: visit.id,
-        patientId: visit.patientId,
-        patientName: `${visit.patient.firstName} ${visit.patient.lastName}`,
-        patientPhone: visit.patient.phone,
-        doctorName: visit.doctor?.name || 'Unknown',
-        bill: visit.bill,
-        visitDate: visit.createdAt,
-        completedAt: visit.updatedAt,
-      }))
+    const pendingBills = bills.map((bill) => ({
+      visitId: bill.visitId,
+      patientId: bill.patientId,
+      patientName: `${bill.patient.firstName} ${bill.patient.lastName}`,
+      patientPhone: bill.patient.phone,
+      doctorName: bill.visit.doctor?.name || 'Unknown',
+      bill,
+      visitDate: bill.visit.createdAt,
+      completedAt: bill.visit.updatedAt,
+    }))
 
     return NextResponse.json({
       success: true,

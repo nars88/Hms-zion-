@@ -11,18 +11,19 @@ type DiagnosticDepartment = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 interface LabRequest {
   at: string
   testType: string
-  status: 'Pending' | 'Completed'
+  status: 'PENDING' | 'IN_PROGRESS' | 'SAMPLE_COLLECTED' | 'COMPLETED'
   result?: string
   completedAt?: string
   attachmentPath?: string
   technicianNotes?: string
+  releasedToDoctorAt?: string
 }
 
 const DEPARTMENT_ORDER_TYPES: Record<DiagnosticDepartment, string[]> = {
   Lab: ['LAB', 'LAB_REQUESTED'],
-  Radiology: ['RADIOLOGY_REQUESTED'],
-  Sonar: ['SONAR_REQUESTED'],
-  ECG: ['ECG_REQUESTED'],
+  Radiology: ['RADIOLOGY_REQUESTED', 'RADIOLOGY', 'XRAY', 'X_RAY'],
+  Sonar: ['SONAR_REQUESTED', 'SONAR', 'ULTRASOUND'],
+  ECG: ['ECG_REQUESTED', 'ECG'],
 }
 const DEPARTMENT_RESULTS_KEY: Record<DiagnosticDepartment, string> = {
   Lab: 'labResults',
@@ -41,10 +42,6 @@ export async function GET(request: Request) {
     const visits = await prisma.visit.findMany({
       where: {
         status: { not: VisitStatus.Discharged },
-        OR: [
-          { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-          { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-        ],
       },
       orderBy: { createdAt: 'asc' },
       select: {
@@ -83,11 +80,6 @@ export async function GET(request: Request) {
     let nextBedNumber = 1
 
     for (const v of visits) {
-      let bedNum = (v as { bedNumber?: number | null }).bedNumber
-      if (bedNum == null) {
-        if (nextBedNumber > TOTAL_BEDS) continue
-        bedNum = nextBedNumber++
-      }
       const patientName = `${v.patient?.firstName ?? ''} ${v.patient?.lastName ?? ''}`.trim()
       const labRequests: LabRequest[] = []
       let resultsList: Array<{
@@ -132,6 +124,13 @@ export async function GET(request: Request) {
             const orderMarkedDone = String(order.status || '').toUpperCase() === 'COMPLETED'
             const isImagingDept = department === 'Radiology' || department === 'Sonar' || department === 'ECG'
             const done = isImagingDept ? orderMarkedDone : Boolean(resultRow) || orderMarkedDone
+            const rawStatus = String(order.status || '').toUpperCase()
+            const normalizedActiveStatus: LabRequest['status'] =
+              rawStatus === 'IN_PROGRESS'
+                ? 'IN_PROGRESS'
+                : rawStatus === 'SAMPLE_COLLECTED'
+                  ? 'SAMPLE_COLLECTED'
+                  : 'PENDING'
             const displayRow =
               resultRow ?? (orderMarkedDone ? resultsList.find((r) => String(r.at) === String(order.at)) : undefined)
             const rawPath = displayRow?.attachmentPath
@@ -140,16 +139,24 @@ export async function GET(request: Request) {
             labRequests.push({
               at: order.at,
               testType,
-              status: done ? 'Completed' : 'Pending',
+              status: done ? 'COMPLETED' : normalizedActiveStatus,
               result: displayRow?.result,
               completedAt: displayRow?.completedAt,
               attachmentPath,
               technicianNotes:
                 typeof displayRow?.technicianNotes === 'string' ? displayRow.technicianNotes : undefined,
+              releasedToDoctorAt:
+                typeof displayRow?.releasedToDoctorAt === 'string' ? displayRow.releasedToDoctorAt : undefined,
             })
           }
         }
       } catch (_) {}
+      if (labRequests.length === 0) continue
+      let bedNum = (v as { bedNumber?: number | null }).bedNumber
+      if (bedNum == null) {
+        if (nextBedNumber > TOTAL_BEDS) continue
+        bedNum = nextBedNumber++
+      }
       const triageLevel = v.patient?.triageLevel ?? null
       const patientAge =
         v.patient?.dateOfBirth instanceof Date

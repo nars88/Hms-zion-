@@ -8,9 +8,11 @@ export const USER_ROLES = {
   DOCTOR: 'DOCTOR',
 
   // Front desk & coordination
-  RECEPTION: 'RECEPTION',
+  RECEPTION: 'RECEPTIONIST', // alias for legacy compatibility
   RECEPTIONIST: 'RECEPTIONIST',
   INTAKE_NURSE: 'INTAKE_NURSE',
+  /** ER vitals-room terminal only (not general intake / reception) */
+  ER_INTAKE_NURSE: 'ER_INTAKE_NURSE',
   ER_NURSE: 'ER_NURSE',
   SECRETARY: 'SECRETARY',
 
@@ -48,6 +50,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const getCookieValue = (name: string): string | null => {
+    if (typeof document === 'undefined') return null
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+    return match ? decodeURIComponent(match[1]) : null
+  }
+
   // In production, get user from session/localStorage/API
   const [user, setUser] = useState<User | null>(() => {
     // Read from localStorage if available (from login)
@@ -55,11 +63,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const savedUser = localStorage.getItem('zionmed_user')
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser) as User
-        // middleware.ts uses cookies to decide auth; if cookies are missing we consider the
-        // stored user stale and force a clean login UI (prevents infinite redirect loops).
-        const hasAuthTokenCookie = document.cookie.includes('zionmed_auth_token=')
+        // The signed JWT is now httpOnly (JS cannot see it). We rely on the
+        // JS-readable role cookie as a presence signal — if it was cleared
+        // (by logout, expired session, or middleware wipe) we also discard
+        // the cached user to keep the UI in sync with the server.
         const hasUserRoleCookie = document.cookie.includes('zionmed_user_role=')
-        if (!hasAuthTokenCookie || !hasUserRoleCookie) {
+        if (!hasUserRoleCookie) {
+          localStorage.removeItem('zionmed_user')
+          return null
+        }
+        const cookieRole = getCookieValue('zionmed_user_role')
+        if (cookieRole && cookieRole !== parsedUser.role) {
+          // Prevent cross-role overlap after account switches/partial refreshes.
+          // Force clean login instead of silently landing on wrong dashboard.
           localStorage.removeItem('zionmed_user')
           return null
         }
@@ -74,8 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
     if (typeof window !== 'undefined') {
       localStorage.setItem('zionmed_user', JSON.stringify(userData))
-      // Set cookies for middleware
-      document.cookie = `zionmed_auth_token=${userData.id}; path=/; max-age=86400` // 24 hours
+      // Note: zionmed_auth_token is now set server-side as httpOnly by the
+      // /api/auth/login response. We only mirror the role cookie here as a
+      // safety net in case the browser dropped the Set-Cookie (non-HTTPS
+      // quirks, iframes, etc.) — this cookie is UI-only and never trusted.
       document.cookie = `zionmed_user_role=${userData.role}; path=/; max-age=86400`
     }
   }
@@ -84,9 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     if (typeof window !== 'undefined') {
       localStorage.removeItem('zionmed_user')
-      // Clear cookies
-      document.cookie = 'zionmed_auth_token=; path=/; max-age=0'
+      // Clear the JS-readable role cookie client-side for instant UI update.
       document.cookie = 'zionmed_user_role=; path=/; max-age=0'
+      // httpOnly auth token can only be cleared via Set-Cookie from the server.
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     }
   }
 
@@ -127,14 +146,14 @@ export function getRoleColor(role: UserRole): string {
       return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
     case 'RECEPTIONIST':
       return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
-    case 'RECEPTION':
-      return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
     case 'PHARMACIST':
       return 'text-rose-400 bg-rose-500/10 border-rose-500/20'
     case 'ACCOUNTANT':
       return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
     case 'INTAKE_NURSE':
       return 'text-teal-300 bg-teal-500/10 border-teal-500/20'
+    case 'ER_INTAKE_NURSE':
+      return 'text-emerald-300 bg-emerald-600/15 border-emerald-500/25'
     case 'ER_NURSE':
       return 'text-red-300 bg-red-500/10 border-red-500/20'
     case 'SECRETARY':
@@ -159,14 +178,14 @@ export function getRoleIconColor(role: UserRole): string {
       return 'text-emerald-400'
     case 'RECEPTIONIST':
       return 'text-cyan-400'
-    case 'RECEPTION':
-      return 'text-cyan-400'
     case 'PHARMACIST':
       return 'text-rose-400'
     case 'ACCOUNTANT':
       return 'text-blue-400'
     case 'INTAKE_NURSE':
       return 'text-teal-300'
+    case 'ER_INTAKE_NURSE':
+      return 'text-emerald-300'
     case 'ER_NURSE':
       return 'text-red-300'
     case 'SECRETARY':

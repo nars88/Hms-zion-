@@ -54,6 +54,13 @@ async function main() {
       phone: '+964 750 000 0003',
     },
     {
+      email: 'er-intake@zion.com',
+      password: 'zion1234',
+      name: 'ER Vitals Station',
+      role: UserRole.ER_INTAKE_NURSE,
+      phone: '+964 750 000 0014',
+    },
+    {
       email: 'doctor@zionmed.com',
       password: 'doctor123',
       name: 'Dr. Sarah Smith',

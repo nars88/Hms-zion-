@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,14 +13,20 @@ export interface ERTask {
   content?: string
   at: string
   status?: string
+  assigneeUserId?: string
+  priority?: 'CRITICAL' | 'NORMAL'
 }
 
-// GET /api/emergency/tasks - Returns tasks from all ER visits (for Nurse dashboard real-time sync)
-export async function GET() {
+// GET /api/emergency/tasks — pending NURSE_TASK for logged-in ER nurse (POOL or self)
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
     const visits = await prisma.visit.findMany({
       where: {
-        status: { not: VisitStatus.Discharged },
+        status: { notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED] },
         OR: [
           { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
           { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
@@ -28,6 +35,7 @@ export async function GET() {
       select: {
         id: true,
         notes: true,
+        bedNumber: true,
         patient: {
           select: {
             firstName: true,
@@ -39,13 +47,30 @@ export async function GET() {
 
     const tasks: ERTask[] = []
     for (const v of visits) {
-      const bedNumber = (v as { bedNumber?: number | null }).bedNumber ?? null
+      const bedNumber = v.bedNumber ?? null
       const patientName = `${v.patient?.firstName ?? ''} ${v.patient?.lastName ?? ''}`.trim()
       try {
         if (!v.notes) continue
-        const parsed = JSON.parse(v.notes) as { erOrders?: Array<{ type: string; content?: string; at: string; status?: string }> }
+        const parsed = JSON.parse(v.notes) as {
+          erCriticalAlert?: boolean
+          erOrders?: Array<{
+            type: string
+            content?: string
+            at: string
+            status?: string
+            assigneeUserId?: string
+          }>
+        }
+        const priority: 'CRITICAL' | 'NORMAL' = parsed.erCriticalAlert ? 'CRITICAL' : 'NORMAL'
         const erOrders = parsed.erOrders || []
         for (const order of erOrders) {
+          if (order.type !== 'NURSE_TASK') continue
+          const st = order.status || 'TASK_PENDING'
+          if (st !== 'TASK_PENDING' && st !== 'PENDING') continue
+          const assignee = order.assigneeUserId || 'POOL'
+          if (user.role === 'ER_NURSE') {
+            if (assignee !== 'POOL' && assignee !== user.id) continue
+          }
           tasks.push({
             visitId: v.id,
             patientName,
@@ -54,11 +79,12 @@ export async function GET() {
             content: order.content,
             at: order.at,
             status: order.status,
+            assigneeUserId: assignee,
+            priority,
           })
         }
       } catch (_) {}
     }
-    // Newest first
     tasks.sort((a, b) => (b.at > a.at ? 1 : -1))
     return NextResponse.json(tasks)
   } catch (e) {

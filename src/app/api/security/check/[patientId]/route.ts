@@ -45,11 +45,21 @@ export async function GET(
       )
     }
 
+    const pendingPharmacyOrder = await prisma.medicationOrder.findFirst({
+      where: {
+        visitId: visit.id,
+        status: { in: ['PENDING', 'OUT_OF_STOCK'] },
+      },
+      select: { id: true },
+    })
+
+    const effectiveQrStatus = pendingPharmacyOrder ? 'LOCKED' : (visit.bill.qrStatus || 'LOCKED')
+
     return NextResponse.json({
       patientId: visit.patient.id,
       patientName: `${visit.patient.firstName} ${visit.patient.lastName}`,
       visitId: visit.id,
-      qrStatus: visit.bill.qrStatus || 'LOCKED',
+      qrStatus: effectiveQrStatus,
       paymentStatus: visit.bill.paymentStatus,
       total: Number(visit.bill.total),
     })

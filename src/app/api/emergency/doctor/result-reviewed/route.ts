@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-type Department = 'Lab' | 'Radiology' | 'Sonar'
+type Department = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 
 // POST /api/emergency/doctor/result-reviewed
 // Mark diagnostic result as reviewed (stops pulse on bed card; icon stays green)
@@ -11,9 +11,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { visitId, department } = body as { visitId?: string; department?: Department }
-    if (!visitId || !department || !['Lab', 'Radiology', 'Sonar'].includes(department)) {
+    if (!visitId || !department || !['Lab', 'Radiology', 'Sonar', 'ECG'].includes(department)) {
       return NextResponse.json(
-        { error: 'visitId and department (Lab | Radiology | Sonar) required' },
+        { error: 'visitId and department (Lab | Radiology | Sonar | ECG) required' },
         { status: 400 }
       )
     }

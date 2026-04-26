@@ -5,13 +5,13 @@ import { VisitStatus, MedicationOrderStatus } from '@prisma/client'
 export const dynamic = 'force-dynamic'
 
 // GET /api/pharmacy/orders
-// Active medication orders only: not Discharged, not CLOSED (patient declined / end visit).
+// Active medication orders only: pending/out-of-stock and not discharged.
 // CLOSED orders remain in DB for history; they are excluded from the active queue.
 export async function GET() {
   try {
     const orders = await prisma.medicationOrder.findMany({
       where: {
-        status: { not: MedicationOrderStatus.CLOSED },
+        status: { in: [MedicationOrderStatus.PENDING, MedicationOrderStatus.OUT_OF_STOCK] },
         visit: {
           status: { not: VisitStatus.Discharged },
         },

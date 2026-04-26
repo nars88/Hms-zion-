@@ -82,7 +82,7 @@ export async function POST(request: Request) {
           lastResultAt,
           [key]: list,
         }),
-        ...(advanceToClinicalQueue && { status: VisitStatus.COMPLETED }),
+        ...(advanceToClinicalQueue && { status: VisitStatus.READY_FOR_REVIEW }),
         updatedAt: new Date(),
       },
     })

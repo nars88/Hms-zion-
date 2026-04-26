@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
     const visits = await prisma.visit.findMany({
       where: {
         status: 'Waiting',
@@ -44,8 +49,7 @@ export async function GET() {
       }))
 
     return NextResponse.json(result)
-  } catch (error) {
-    console.error('❌ Error fetching waiting patients for intake:', error)
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch waiting patients.' },
       { status: 500 }

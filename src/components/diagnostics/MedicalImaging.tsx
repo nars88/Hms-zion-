@@ -24,46 +24,31 @@ interface ImagingStudy {
   editHistory?: Array<{ version: number; editedBy: string; editedAt: string; previousValue: string }>
 }
 
-// Mock data
+/** UI-only demo: two patients per diagnostics imaging tab (no DB). */
 const mockStudies: ImagingStudy[] = [
   {
-    id: '1',
-    patientName: 'John Doe',
-    patientId: 'P001',
+    id: 'dx-img-mock-1',
+    patientName: 'مريض تجريبي أ — Demo Alpha',
+    patientId: 'DX-MOCK-IMG-01',
     studyType: 'CT',
     bodyPart: 'Chest',
-    date: '2024-01-15 10:30',
-    status: 'Urgent',
-    aiAnalysis: {
-      findings: 'Pneumonia risk detected in lower right lobe',
-      risk: 'High',
-      confidence: 87,
-    },
+    date: '2026-04-24 09:00',
+    status: 'Pending',
     version: 1,
   },
   {
-    id: '2',
-    patientName: 'Jane Smith',
-    patientId: 'P002',
+    id: 'dx-img-mock-2',
+    patientName: 'مريض تجريبي ب — Demo Beta',
+    patientId: 'DX-MOCK-IMG-02',
     studyType: 'MRI',
     bodyPart: 'Brain',
-    date: '2024-01-15 09:15',
+    date: '2026-04-24 10:15',
     status: 'Completed',
     aiAnalysis: {
-      findings: 'No abnormalities detected',
+      findings: 'No focal lesion; ventricular system within normal limits (demo).',
       risk: 'Low',
-      confidence: 92,
+      confidence: 91,
     },
-    version: 1,
-  },
-  {
-    id: '3',
-    patientName: 'Robert Johnson',
-    patientId: 'P003',
-    studyType: 'X-Ray',
-    bodyPart: 'Chest',
-    date: '2024-01-15 11:00',
-    status: 'Pending',
     version: 1,
   },
 ]

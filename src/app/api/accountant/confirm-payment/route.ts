@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,20 +11,15 @@ const ALLOWED_ROLES = ['ACCOUNTANT', 'ADMIN']
 // Marks bill as PAID. Only Accountant or Admin can trigger this.
 export async function POST(request: NextRequest) {
   try {
-    const roleCookie = request.cookies.get('zionmed_user_role')
-    const userIdCookie = request.cookies.get('zionmed_auth_token')
-
-    if (!userIdCookie?.value || !roleCookie?.value || !ALLOWED_ROLES.includes(roleCookie.value)) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Only Accountant or Admin can confirm payments.' },
-        { status: 403 }
-      )
-    }
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!ALLOWED_ROLES.includes(user.role)) return forbidden()
 
     const body = await request.json()
     const { visitId, paymentMethod, confirmedBy } = body
 
-    if (!visitId || !confirmedBy) {
+    const confirmedById = String(confirmedBy || user.id || '').trim()
+    if (!visitId || !confirmedById) {
       return NextResponse.json(
         { error: 'Missing required fields: visitId, confirmedBy' },
         { status: 400 }
@@ -57,6 +53,7 @@ export async function POST(request: NextRequest) {
         paymentMethod: paymentMethod || 'Cash',
         paidAt: new Date(),
         qrStatus: 'CLEARED', // Clear QR code for exit
+        generatedBy: confirmedById,
         updatedAt: new Date(),
       },
     })

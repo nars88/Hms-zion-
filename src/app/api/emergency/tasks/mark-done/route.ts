@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { VisitStatus } from '@prisma/client'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
+import { logEmergencyActivity } from '@/lib/emergencyActivity'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const visitId = body.visitId
     const at = body.at
@@ -13,7 +20,7 @@ export async function POST(request: Request) {
     }
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, notes: true },
+      select: { id: true, notes: true, status: true },
     })
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
 
@@ -23,19 +30,51 @@ export async function POST(request: Request) {
     } catch (_) {}
     const erOrders = (parsed.erOrders as Array<{ type: string; content?: string; at: string; status?: string }>) || []
     let found = false
+    let nurseTask = false
     for (const order of erOrders) {
       if (order.at === at) {
         order.status = 'DONE'
         found = true
+        nurseTask = order.type === 'NURSE_TASK'
         break
       }
     }
     if (!found) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+
+    const now = new Date()
+    const nextNotes = nurseTask
+      ? {
+          ...parsed,
+          erOrders,
+          erFlowStatus: 'FINISHED' as const,
+          nurseTaskFinishedAt: now.toISOString(),
+        }
+      : { ...parsed, erOrders }
+
     await prisma.visit.update({
       where: { id: visitId },
-      data: { notes: JSON.stringify({ ...parsed, erOrders }), updatedAt: new Date() },
+      data: {
+        notes: JSON.stringify(nextNotes),
+        updatedAt: now,
+        ...(nurseTask && visit.status !== VisitStatus.COMPLETED
+          ? {
+              status: VisitStatus.COMPLETED,
+              dischargeDate: now,
+              bedNumber: null,
+            }
+          : {}),
+      },
     })
-    return NextResponse.json({ success: true })
+    if (nurseTask) {
+      await logEmergencyActivity({
+        visitId,
+        action: 'Task Completed',
+        details: 'Nurse task marked as completed',
+        actorUserId: user.id,
+        actorName: user.name ?? user.role,
+      })
+    }
+    return NextResponse.json({ success: true, visitFinished: nurseTask })
   } catch (e: unknown) {
     const err = e as Error
     console.error('Error marking task done:', err)

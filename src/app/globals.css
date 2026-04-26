@@ -1,3 +1,5 @@
+html, body { background-color: #020b18; }
+
 html {
   scroll-behavior: smooth;
 }
@@ -7,7 +9,22 @@ html {
 
 @import '../styles/rtl.css';
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Landing page keyframes (moved from page.tsx to keep it a server component). */
+@keyframes zion-spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes zion-spin-slow-rev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+@keyframes zion-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes zion-pulse-dash {
+  to { stroke-dashoffset: -220; }
+}
 
 :root {
   /* Refined Dark Theme - Softer Palette */
@@ -45,6 +62,7 @@ html {
   border: none;
   margin: 0;
   padding: 0;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 body {
@@ -56,12 +74,15 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
+.dark html,
 .dark body {
   background-color: #0B1120;
 }
 
+.light html,
 .light body {
   background-color: #F1F5F9;
 }

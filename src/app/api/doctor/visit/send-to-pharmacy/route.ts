@@ -70,9 +70,26 @@ export async function POST(request: Request) {
       throw new Error('Failed to find or create visit for patient')
     }
 
-    // Format prescription as text string (matching the schema)
-    const prescriptionText = prescriptionItems
-      .map((item: any) => `${item.medicineName || item.medicine} ${item.dosage || ''} - ${item.frequency || ''}`)
+    const normalizedItems = (prescriptionItems as Array<any>)
+      .map((item) => ({
+        medicineName: String(item.medicineName || item.medicine || item.name || '').trim(),
+        dosage: String(item.dosage || item.dose || '').trim(),
+        frequency: String(item.frequency || item.instructions || item.notes || '').trim() || 'As prescribed',
+        notes: String(item.notes || '').trim(),
+        price: Number(item.price) || 0,
+      }))
+      .filter((item) => item.medicineName || item.dosage || item.frequency)
+
+    if (normalizedItems.length === 0) {
+      return NextResponse.json(
+        { error: 'Prescription items are required' },
+        { status: 400 }
+      )
+    }
+
+    // Keep visit.prescription as readable text, sourced from normalized array
+    const prescriptionText = normalizedItems
+      .map((item) => `${item.medicineName} ${item.dosage}`.trim() + ` - ${item.frequency}`)
       .join('\n')
 
     // Update visit status to READY_FOR_PHARMACY
@@ -88,13 +105,18 @@ export async function POST(request: Request) {
     })
 
     // Create or update MedicationOrder (visit-based) for pharmacy feed
-    const orderItems = (prescriptionItems as Array<{ medicineName?: string; medicine?: string; dosage?: string; frequency?: string }>).map((item) => ({
-      medicineName: item.medicineName || item.medicine || '',
-      dosage: item.dosage || '',
-      frequency: item.frequency || 'As prescribed',
+    const orderItems = normalizedItems.map((item) => ({
+      name: item.medicineName,
+      dose: item.dosage,
+      instructions: item.frequency,
+      medicineName: item.medicineName,
+      dosage: item.dosage,
+      frequency: item.frequency,
       quantity: 1,
-      unitPrice: 0,
-      totalPrice: 0,
+      unitPrice: item.price,
+      totalPrice: item.price,
+      price: item.price,
+      notes: item.notes || undefined,
     }))
     await prisma.medicationOrder.upsert({
       where: { visitId: visit.id },

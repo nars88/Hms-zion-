@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,12 @@ interface RegisterBody {
 
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    const role = String(user.role || '').toUpperCase()
+    const allowedRoles = ['RECEPTION', 'RECEPTIONIST', 'SECRETARY', 'INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE', 'ADMIN']
+    if (!allowedRoles.includes(role)) return forbidden()
+
     const body = (await request.json()) as RegisterBody
     const { fullName, age, phone, gender, department } = body
 
@@ -75,8 +82,7 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     )
-  } catch (error) {
-    console.error('❌ Error in unified registration:', error)
+  } catch {
     return NextResponse.json(
       { error: 'Failed to register patient.' },
       { status: 500 }

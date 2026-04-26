@@ -80,6 +80,8 @@ model Visit {
   patientId        String
   doctorId         String?
   status           VisitStatus      @default(Waiting)
+  /// ER bed slot (1–12) for nurse/doctor bed boards
+  bedNumber        Int?
   chiefComplaint   String?
   diagnosis        String?
   prescription     String?
@@ -184,6 +186,10 @@ model Vitals {
   temperature Float
   heartRate   Int
   weight      Float
+  /// SpO₂ % (ER Vitals Station)
+  spo2        Float?
+  /// e.g. "ER-Vitals" when recorded via ER Vitals Station (dedicated ER intake terminal)
+  recordingSource String?
   recordedAt  DateTime @default(now())
   patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   visit       Visit?   @relation(fields: [visitId], references: [id])
@@ -217,6 +223,17 @@ model departments {
   employee_ids     Json?
 }
 
+enum Department {
+  CARDIOLOGY
+  ORTHOPEDICS
+  INTERNAL_MEDICINE
+  PEDIATRICS
+  GENERAL_SURGERY
+  NEUROLOGY
+  OPHTHALMOLOGY
+  DERMATOLOGY
+}
+
 enum UserRole {
   ADMIN
   DOCTOR
@@ -227,6 +244,8 @@ enum UserRole {
   RECEPTIONIST
   SECRETARY
   INTAKE_NURSE
+  /// Dedicated ER vitals-room terminal (not general intake / reception)
+  ER_INTAKE_NURSE
   ER_NURSE
   LAB_TECH
   RADIOLOGY_TECH
@@ -234,6 +253,8 @@ enum UserRole {
 
 enum VisitStatus {
   Waiting
+  /// ER Vitals Station saved — awaiting physician
+  WAITING_FOR_DOCTOR
   In_Consultation
   Billing
   Discharged

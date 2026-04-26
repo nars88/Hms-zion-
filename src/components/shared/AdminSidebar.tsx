@@ -40,6 +40,7 @@ export default function AdminSidebar() {
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
         <Link
           href={ADMIN_DASHBOARD_HREF}
+          prefetch
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
             isAdminPage && (!section || section === 'dashboard')
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
@@ -51,6 +52,7 @@ export default function AdminSidebar() {
         </Link>
         <Link
           href={ADMIN_DEPARTMENTS_HREF}
+          prefetch
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
             linkActive(ADMIN_DEPARTMENTS_HREF)
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
@@ -62,6 +64,7 @@ export default function AdminSidebar() {
         </Link>
         <Link
           href={ADMIN_REPORTS_HREF}
+          prefetch
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
             linkActive(ADMIN_REPORTS_HREF)
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
@@ -73,6 +76,7 @@ export default function AdminSidebar() {
         </Link>
         <Link
           href={ADMIN_SETTINGS_HREF}
+          prefetch
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
             linkActive(ADMIN_SETTINGS_HREF)
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'

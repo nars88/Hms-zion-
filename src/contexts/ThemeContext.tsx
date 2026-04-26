@@ -27,17 +27,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    // Apply theme to html element
     const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-      root.classList.remove('light')
-    } else {
-      root.classList.add('light')
-      root.classList.remove('dark')
-    }
-    
-    // Save to localStorage
+    root.classList.remove('dark', 'light')
+    root.classList.add(theme)
+    root.style.colorScheme = theme
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('zionmed_theme', theme)
     }

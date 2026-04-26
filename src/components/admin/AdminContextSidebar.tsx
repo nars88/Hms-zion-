@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ElementType } from 'react'
+import { type ElementType } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import {
@@ -50,8 +50,8 @@ export default function AdminContextSidebar() {
         {isReception && (
           <>
             <NavLink href="/admin/reception" pathname={pathname} icon={Users} label="Patients" searchParams={searchParams} />
-            <NavLink href="/admin/reception#registration" pathname={pathname} icon={UserPlus} label="Registration" searchParams={searchParams} />
-            <NavLink href="/admin/reception#triage" pathname={pathname} icon={ClipboardList} label="Triage" searchParams={searchParams} />
+            <NavLink href="/admin/reception?section=registration" pathname={pathname} icon={UserPlus} label="Registration" searchParams={searchParams} />
+            <NavLink href="/admin/reception?section=triage" pathname={pathname} icon={ClipboardList} label="Triage" searchParams={searchParams} />
           </>
         )}
 
@@ -99,23 +99,12 @@ function NavLink({
   icon: ElementType
   label: string
 }) {
-  const [hash, setHash] = useState('')
-  useEffect(() => {
-    setHash(typeof window !== 'undefined' ? window.location.hash : '')
-    const onHash = () => setHash(window.location.hash)
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
-  }, [])
-
   const base = href.split('?')[0].split('#')[0]
-  const hrefHash = href.includes('#') ? '#' + (href.split('#')[1] || '') : ''
   const section = href.includes('section=') ? href.split('section=')[1]?.split('&')[0] : null
 
   let isActive: boolean
   if (section !== null && section !== undefined) {
     isActive = pathname === base && searchParams?.get('section') === section
-  } else if (hrefHash) {
-    isActive = pathname === base && hash === hrefHash
   } else if (base === '/admin/settings') {
     isActive = pathname === base || pathname.startsWith(base + '/')
   } else {
@@ -126,6 +115,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      prefetch
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${
         isActive
           ? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/50 shadow-[0_0_0_1px_rgba(6,182,212,0.35)]'

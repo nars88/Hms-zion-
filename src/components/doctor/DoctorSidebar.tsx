@@ -45,6 +45,7 @@ export default function DoctorSidebar() {
             <Link
               key={item.view}
               href={href}
+              prefetch
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                 isActive
                   ? 'bg-cyan-500/15 text-cyan-200 border-cyan-500/30'

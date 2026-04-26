@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus, VisitStatus } from '@prisma/client'
+import { getMedicationAllergyConflicts } from '@/lib/pharmacySafety'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,9 @@ export async function POST(
 ) {
   try {
     const orderId = params.orderId
+    const body = (await request.json().catch(() => ({}))) as {
+      selectedItems?: Array<{ medicineName?: string; medication?: string; dosage?: string; quantity?: number }>
+    }
 
     const order = await prisma.medicationOrder.findUnique({
       where: { id: orderId },
@@ -36,27 +40,71 @@ export async function POST(
       )
     }
 
-    const orderItems = (order.items as OrderItem[]) || []
+    const payloadItems = Array.isArray(body.selectedItems) ? body.selectedItems : []
+    const orderItems =
+      payloadItems.length > 0
+        ? payloadItems.map((i) => ({
+            medicineName: String(i.medicineName || i.medication || '').trim(),
+            dosage: String(i.dosage || '').trim(),
+            quantity: Number(i.quantity) || 1,
+          }))
+        : ((order.items as OrderItem[]) || [])
     if (orderItems.length === 0) {
       return NextResponse.json({ error: 'Order has no items' }, { status: 400 })
+    }
+    const medicationNames = orderItems.map((item) => String(item.medicineName || '').trim()).filter(Boolean)
+    const allergyConflicts = getMedicationAllergyConflicts(medicationNames, visit.patient?.allergies || null)
+    if (allergyConflicts.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Cannot dispense due to allergy conflict.',
+          status: 'Cannot dispense',
+          conflicts: allergyConflicts,
+          instruction: 'Verify with doctor',
+        },
+        { status: 409 }
+      )
     }
 
     const allInventory = await prisma.inventory.findMany({
       where: { deletedAt: null },
+      select: {
+        id: true,
+        drugName: true,
+        currentStock: true,
+        pricePerUnit: true,
+      },
     })
 
-    const drugNameMatch = (inv: { drugName: string }, name: string) => {
-      const n = (name || '').toLowerCase().trim()
-      const d = inv.drugName.toLowerCase().trim()
-      return d === n || n.includes(d) || d.includes(n)
+    const normalizeDrugName = (value: string) =>
+      String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\b\d+\s*(mg|ml|g|mcg|tabs?|tablets?|caps?|capsules?)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    const findInventoryMatch = (medicineName: string) => {
+      const n = normalizeDrugName(medicineName)
+      return allInventory.find((inv) => {
+        const d = normalizeDrugName(inv.drugName)
+        return d === n || d.includes(n) || n.includes(d)
+      })
     }
 
-    type Resolved = { item: OrderItem; inv: (typeof allInventory)[0]; qty: number }
+    type Resolved = { item: OrderItem; inv: { id: string; drugName: string; currentStock: number; pricePerUnit: unknown }; qty: number }
     const resolved: Resolved[] = []
     for (const item of orderItems) {
       const name = (item.medicineName || '').trim()
       const qty = Math.max(1, Number(item.quantity) || 1)
-      const inv = allInventory.find((i) => drugNameMatch(i, name))
+      const inv = findInventoryMatch(name)
+      console.log('[Pharmacy Dispense] Stock check:', {
+        orderId,
+        requestedMedicine: name,
+        requestedQty: qty,
+        matchedInventoryDrug: inv?.drugName ?? null,
+        availableStock: inv?.currentStock ?? 0,
+      })
       if (!inv) {
         return NextResponse.json(
           { error: `Insufficient Stock: "${name}" not found in inventory. Add the drug to inventory first.` },
@@ -74,11 +122,31 @@ export async function POST(
 
     let bill = visit.bill
     if (!bill) {
+      const doctorUser = visit.doctorId
+        ? await prisma.user.findUnique({
+            where: { id: visit.doctorId },
+            select: { id: true },
+          })
+        : null
+      const fallbackUser = doctorUser
+        ? null
+        : await prisma.user.findFirst({
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          })
+      const generatedByUserId = doctorUser?.id || fallbackUser?.id
+      if (!generatedByUserId) {
+        return NextResponse.json(
+          { error: 'Cannot generate bill: no valid billing user found.' },
+          { status: 500 }
+        )
+      }
+
       bill = await prisma.bill.create({
         data: {
           visitId: visit.id,
           patientId: visit.patientId,
-          generatedBy: 'system',
+          generatedBy: generatedByUserId,
           items: [],
           subtotal: 0,
           tax: 0,
@@ -138,6 +206,15 @@ export async function POST(
           items: allItems,
           subtotal,
           total,
+          paymentStatus: 'Pending',
+          qrStatus: 'LOCKED',
+          updatedAt: new Date(),
+        },
+      }),
+      prisma.visit.update({
+        where: { id: visit.id },
+        data: {
+          status: VisitStatus.Billing,
           updatedAt: new Date(),
         },
       }),

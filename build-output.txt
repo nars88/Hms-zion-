@@ -1,0 +1,267 @@
+
+> zion-med@1.0.0 build
+> next build
+
+  Gû¦ Next.js 14.2.35
+  - Environments: .env
+
+   Creating an optimized production build ...
+ G£ô Compiled successfully
+   Linting and checking validity of types ...
+node.exe : The prop value with an expression type of TSNonNullExpression could not be resolved. Please file an issue ( 
+https://github.com/jsx-eslint/jsx-ast-utils/issues/new ) to get this fixed immediately.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (The prop value ...ed immediately.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The prop value with an expression type of TSNonNullExpression could not be resolved. Please file an issue ( 
+https://github.com/jsx-eslint/jsx-ast-utils/issues/new ) to get this fixed immediately.
+
+./src/app/(app)/accountant/page.tsx
+212:17  Warning: Unexpected console statement.  no-console
+
+./src/app/(app)/doctor/dashboard/[patientId]/page.tsx
+1479:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+1564:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/(app)/pharmacy/page.tsx
+54:36  Warning: Unexpected console statement.  no-console
+
+./src/app/(app)/radiology/page.tsx
+444:35  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+457:35  Warning: Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.  jsx-a11y/alt-text
+549:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+692:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/api/doctor/visit/send-to-pharmacy/route.ts
+41:9  Warning: Unexpected console statement.  no-console
+58:7  Warning: Unexpected console statement.  no-console
+
+./src/components/cashier/LivePaymentFeed.tsx
+40:7  Warning: Unexpected console statement.  no-console
+
+./src/components/cashier/PaymentProcessor.tsx
+47:7  Warning: Unexpected console statement.  no-console
+50:9  Warning: Unexpected console statement.  no-console
+51:9  Warning: Unexpected console statement.  no-console
+115:5  Warning: Unexpected console statement.  no-console
+131:7  Warning: Unexpected console statement.  no-console
+136:5  Warning: Unexpected console statement.  no-console
+141:5  Warning: Unexpected console statement.  no-console
+
+./src/components/doctor/ERFastTrackArea.tsx
+114:3  Warning: Unexpected console statement.  no-console
+250:5  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/AppointmentBookingModal.tsx
+186:9  Warning: Unexpected console statement.  no-console
+187:9  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/AppointmentNotifications.tsx
+31:13  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/CheckInModal.tsx
+20:5  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/MedicalRecordModal.tsx
+44:11  Warning: Unexpected console statement.  no-console
+50:11  Warning: Unexpected console statement.  no-console
+58:11  Warning: Unexpected console statement.  no-console
+61:11  Warning: Unexpected console statement.  no-console
+62:11  Warning: Unexpected console statement.  no-console
+73:5  Warning: Unexpected console statement.  no-console
+74:5  Warning: Unexpected console statement.  no-console
+75:5  Warning: Unexpected console statement.  no-console
+76:5  Warning: Unexpected console statement.  no-console
+85:7  Warning: Unexpected console statement.  no-console
+96:7  Warning: Unexpected console statement.  no-console
+161:5  Warning: Unexpected console statement.  no-console
+173:9  Warning: Unexpected console statement.  no-console
+177:11  Warning: Unexpected console statement.  no-console
+183:9  Warning: Unexpected console statement.  no-console
+190:11  Warning: Unexpected console statement.  no-console
+195:7  Warning: Unexpected console statement.  no-console
+209:7  Warning: Unexpected console statement.  no-console
+210:7  Warning: Unexpected console statement.  no-console
+218:7  Warning: Unexpected console statement.  no-console
+220:7  Warning: Unexpected console statement.  no-console
+243:13  Warning: Unexpected console statement.  no-console
+248:9  Warning: Unexpected console statement.  no-console
+260:7  Warning: Unexpected console statement.  no-console
+261:7  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/PatientRegistrationModal.tsx
+132:9  Warning: Unexpected console statement.  no-console
+
+./src/components/reception/PatientSearch.tsx
+46:9  Warning: Unexpected console statement.  no-console
+
+./src/components/shared/UserProfile.tsx
+33:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/contexts/PatientRegistryContext.tsx
+45:11  Warning: Unexpected console statement.  no-console
+55:9  Warning: Unexpected console statement.  no-console
+63:5  Warning: Unexpected console statement.  no-console
+69:7  Warning: Unexpected console statement.  no-console
+101:7  Warning: Unexpected console statement.  no-console
+109:5  Warning: Unexpected console statement.  no-console
+151:7  Warning: Unexpected console statement.  no-console
+159:9  Warning: Unexpected console statement.  no-console
+205:9  Warning: Unexpected console statement.  no-console
+211:5  Warning: Unexpected console statement.  no-console
+264:5  Warning: Unexpected console statement.  no-console
+265:5  Warning: Unexpected console statement.  no-console
+266:5  Warning: Unexpected console statement.  no-console
+279:9  Warning: Unexpected console statement.  no-console
+294:15  Warning: Unexpected console statement.  no-console
+319:15  Warning: Unexpected console statement.  no-console
+329:17  Warning: Unexpected console statement.  no-console
+
+./src/contexts/QRScannerContext.tsx
+84:7  Warning: Unexpected console statement.  no-console
+
+./src/contexts/WaitingListContext.tsx
+38:11  Warning: Unexpected console statement.  no-console
+49:9  Warning: Unexpected console statement.  no-console
+74:5  Warning: Unexpected console statement.  no-console
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/41) ...
+   Generating static pages (10/41) 
+   Generating static pages (20/41) 
+   Generating static pages (30/41) 
+ G£ô Generating static pages (41/41)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                         Size     First Load JS
+Göî Gùï /                                               183 B          96.5 kB
+Gö£ Gùï /_not-found                                     165 B          87.7 kB
+Gö£ Gùï /accountant                                     3.28 kB         118 kB
+Gö£ Gùï /accountant/archive                             2.3 kB          113 kB
+Gö£ Gùï /admin                                          2.79 kB        90.3 kB
+Gö£ Gùï /admin/dashboard                                13.7 kB         209 kB
+Gö£ Gùï /admin/departments                              7.19 kB        94.7 kB
+Gö£ Gùï /admin/lab                                      2.38 kB        89.9 kB
+Gö£ Gùï /admin/lab/results                              1.25 kB        88.8 kB
+Gö£ Gùï /admin/pharmacy                                 3.05 kB         101 kB
+Gö£ Gùï /admin/pharmacy/inventory                       4.91 kB         101 kB
+Gö£ Gùï /admin/reception                                2.8 kB          119 kB
+Gö£ Gùï /admin/reports                                  3.38 kB        95.1 kB
+Gö£ Gùï /admin/settings                                 6.03 kB        93.6 kB
+Gö£ ¦Æ /api/accountant/all-bills                       0 B                0 B
+Gö£ ¦Æ /api/accountant/archive                         0 B                0 B
+Gö£ ¦Æ /api/accountant/bill                            0 B                0 B
+Gö£ ¦Æ /api/accountant/confirm-payment                 0 B                0 B
+Gö£ ¦Æ /api/accountant/pending-bills                   0 B                0 B
+Gö£ ¦Æ /api/admin/backup                               0 B                0 B
+Gö£ ¦Æ /api/admin/create-pharmacist                    0 B                0 B
+Gö£ ¦Æ /api/admin/prices                               0 B                0 B
+Gö£ ¦Æ /api/admin/security/override                    0 B                0 B
+Gö£ ¦Æ /api/auth/create-security-user                  0 B                0 B
+Gö£ ¦Æ /api/auth/login                                 0 B                0 B
+Gö£ ¦Æ /api/auth/logout                                0 B                0 B
+Gö£ ¦Æ /api/auth/verify-role                           0 B                0 B
+Gö£ ¦Æ /api/billing/invoice                            0 B                0 B
+Gö£ ¦Æ /api/billing/invoice/add-item                   0 B                0 B
+Gö£ ¦Æ /api/billing/invoice/add-medications            0 B                0 B
+Gö£ ¦Æ /api/billing/invoice/create-pending             0 B                0 B
+Gö£ ¦Æ /api/billing/invoice/remove-item                0 B                0 B
+Gö£ ¦Æ /api/billing/invoice/sync                       0 B                0 B
+Gö£ ¦Æ /api/billing/invoices                           0 B                0 B
+Gö£ ¦Æ /api/billing/invoices/[id]/pay                  0 B                0 B
+Gö£ ¦Æ /api/departments                                0 B                0 B
+Gö£ ¦Æ /api/departments/[id]                           0 B                0 B
+Gö£ ¦Æ /api/doctor/complete-case                       0 B                0 B
+Gö£ ¦Æ /api/doctor/completed-cases                     0 B                0 B
+Gö£ ¦Æ /api/doctor/queue                               0 B                0 B
+Gö£ ¦Æ /api/doctor/visit/close                         0 B                0 B
+Gö£ ¦Æ /api/doctor/visit/send-to-diagnostics           0 B                0 B
+Gö£ ¦Æ /api/doctor/visit/send-to-pharmacy              0 B                0 B
+Gö£ ¦Æ /api/doctor/visit/start                         0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/append-task               0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/discharge                 0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/lab-request               0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/order-remove              0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/orders                    0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/ready-for-discharge       0 B                0 B
+Gö£ ¦Æ /api/emergency/doctor/result-reviewed           0 B                0 B
+Gö£ ¦Æ /api/emergency/patients                         0 B                0 B
+Gö£ ¦Æ /api/emergency/tasks                            0 B                0 B
+Gö£ ¦Æ /api/emergency/tasks/mark-done                  0 B                0 B
+Gö£ ¦Æ /api/emergency/visit-summary                    0 B                0 B
+Gö£ ¦Æ /api/employees                                  0 B                0 B
+Gö£ ¦Æ /api/employees/[id]                             0 B                0 B
+Gö£ ¦Æ /api/er/create-case                             0 B                0 B
+Gö£ ¦Æ /api/intake/register                            0 B                0 B
+Gö£ ¦Æ /api/intake/vitals                              0 B                0 B
+Gö£ ¦Æ /api/intake/waiting                             0 B                0 B
+Gö£ ¦Æ /api/lab/er-beds                                0 B                0 B
+Gö£ ¦Æ /api/lab/er-beds/release-imaging                0 B                0 B
+Gö£ ¦Æ /api/lab/er-beds/result                         0 B                0 B
+Gö£ ¦Æ /api/lab/er-requests                            0 B                0 B
+Gö£ ¦Æ /api/notifications/counts                       0 B                0 B
+Gö£ ¦Æ /api/patients/[patientId]                       0 B                0 B
+Gö£ ¦Æ /api/patients/by-visit                          0 B                0 B
+Gö£ ¦Æ /api/patients/search                            0 B                0 B
+Gö£ ¦Æ /api/pharmacy/cancel-dispensing                 0 B                0 B
+Gö£ ¦Æ /api/pharmacy/dispense                          0 B                0 B
+Gö£ ¦Æ /api/pharmacy/inventory                         0 B                0 B
+Gö£ ¦Æ /api/pharmacy/inventory/[id]                    0 B                0 B
+Gö£ ¦Æ /api/pharmacy/inventory/[id]/restock            0 B                0 B
+Gö£ ¦Æ /api/pharmacy/orders                            0 B                0 B
+Gö£ ¦Æ /api/pharmacy/orders/[orderId]/close            0 B                0 B
+Gö£ ¦Æ /api/pharmacy/orders/[orderId]/dispense         0 B                0 B
+Gö£ ¦Æ /api/pharmacy/orders/[orderId]/out-of-stock     0 B                0 B
+Gö£ ¦Æ /api/pharmacy/prescription/[visitId]/allergies  0 B                0 B
+Gö£ ¦Æ /api/pharmacy/prescription/[visitId]/dispense   0 B                0 B
+Gö£ ¦Æ /api/pharmacy/prescriptions                     0 B                0 B
+Gö£ ¦Æ /api/prices/get                                 0 B                0 B
+Gö£ ¦Æ /api/radiology/add-procedure                    0 B                0 B
+Gö£ ¦Æ /api/radiology/complete-report                  0 B                0 B
+Gö£ ¦Æ /api/reception/current-visit                    0 B                0 B
+Gö£ ¦Æ /api/reception/er-registration                  0 B                0 B
+Gö£ ¦Æ /api/scanner/resolve                            0 B                0 B
+Gö£ ¦Æ /api/security/check/[patientId]                 0 B                0 B
+Gö£ ¦Æ /api/upload/diagnostic                          0 B                0 B
+Gö£ ¦Æ /api/visits/[visitId]                           0 B                0 B
+Gö£ Gùï /billing                                        4.86 kB         116 kB
+Gö£ Gùï /cashier                                        9.36 kB         120 kB
+Gö£ Gùï /cashier/history                                4.58 kB         108 kB
+Gö£ Gùï /diagnostics                                    13.8 kB         230 kB
+Gö£ Gùï /doctor                                         165 B          87.7 kB
+Gö£ Gùï /doctor/dashboard                               165 B          87.7 kB
+Gö£ ¦Æ /doctor/dashboard/[patientId]                   14.3 kB         118 kB
+Gö£ Gùï /doctor/prescriptions                           4.51 kB         108 kB
+Gö£ Gùï /doctor/queue                                   3.8 kB          107 kB
+Gö£ Gùï /doctor/schedule                                4.83 kB         108 kB
+Gö£ Gùï /doctor/schedule/new                            2.5 kB          106 kB
+Gö£ Gùï /emergency/doctor                               12.6 kB         113 kB
+Gö£ Gùï /emergency/nurse                                9.23 kB         113 kB
+Gö£ Gùï /gatekeeper                                     7.58 kB         111 kB
+Gö£ Gùï /intake                                         6.4 kB          110 kB
+Gö£ Gùï /inventory                                      7.48 kB         111 kB
+Gö£ Gùï /lab                                            5.95 kB         110 kB
+Gö£ Gùï /login                                          4.54 kB        96.1 kB
+Gö£ Gùï /manager                                        4.75 kB         113 kB
+Gö£ Gùï /pharmacy                                       3.83 kB         121 kB
+Gö£ Gùï /pharmacy/dispense                              6.93 kB         111 kB
+Gö£ Gùï /pharmacy/inventory                             4.83 kB         109 kB
+Gö£ Gùï /pharmacy/manager                               5.05 kB         111 kB
+Gö£ Gùï /radiology                                      7.92 kB         112 kB
+Gö£ Gùï /reception                                      5.97 kB         138 kB
+Göö Gùï /security                                       4.24 kB        91.8 kB
++ First Load JS shared by all                       87.5 kB
+  Gö£ chunks/2117-a24dfc03550d3a2a.js                 31.9 kB
+  Gö£ chunks/fd9d1056-b9016c5ae048a2aa.js             53.6 kB
+  Göö other shared chunks (total)                     2 kB
+
+
+Gùï  (Static)   prerendered as static content
+¦Æ  (Dynamic)  server-rendered on demand
+
+

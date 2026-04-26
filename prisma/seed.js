@@ -48,6 +48,13 @@ async function main() {
       phone: '+964 750 000 0003',
     },
     {
+      email: 'er-intake@zion.com',
+      password: 'zion1234',
+      name: 'ER Vitals Station',
+      role: 'ER_INTAKE_NURSE',
+      phone: '+964 750 000 0014',
+    },
+    {
       email: 'doctor@zionmed.com',
       password: 'doctor123',
       name: 'Dr. Sarah Smith',
@@ -128,21 +135,26 @@ async function main() {
 
   for (const user of testUsers) {
     try {
-      // Check if user already exists
-      const existing = await prisma.user.findUnique({
+      const hashedPassword = await bcrypt.hash(user.password, 12)
+      await prisma.user.upsert({
         where: { email: user.email },
+        create: {
+          email: user.email,
+          password: hashedPassword,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+        },
+        update: {
+          password: hashedPassword,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+        },
       })
-
-      if (existing) {
-        console.log(`⚠️  User ${user.email} already exists, skipping...`)
-      } else {
-        await prisma.user.create({
-          data: user,
-        })
-        console.log(`✅ Created user: ${user.email} (${user.role})`)
-      }
+      console.log(`✅ Account reset: ${user.email} (${user.role})`)
     } catch (error) {
-      console.error(`❌ Error creating user ${user.email}:`, error)
+      console.error(`❌ Error resetting user ${user.email}:`, error)
     }
   }
 

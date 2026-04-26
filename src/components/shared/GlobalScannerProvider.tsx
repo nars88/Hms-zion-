@@ -21,7 +21,8 @@ export default function GlobalScannerProvider({ children }: { children: ReactNod
     pathname.startsWith('/pharmacy') ||
     pathname.startsWith('/gatekeeper') ||
     pathname.startsWith('/intake') ||
-    pathname.startsWith('/emergency')
+    pathname.startsWith('/emergency') ||
+    pathname.startsWith('/er')
 
   const handleScan = useCallback(
     async (code: string) => {
@@ -72,9 +73,14 @@ export default function GlobalScannerProvider({ children }: { children: ReactNod
           if (data.patientId) {
             router.push(`/intake?patientId=${data.patientId}`)
           }
-        } else if (pathname.startsWith('/emergency')) {
+        } else if (pathname.startsWith('/er/vitals-station')) {
+          const q = new URLSearchParams()
+          if (data.patientId) q.set('patientId', data.patientId)
+          if (data.visitId) q.set('visitId', data.visitId)
+          router.push(`/er/vitals-station?${q.toString()}`)
+        } else if (pathname.startsWith('/er')) {
           if (data.patientId) {
-            router.push(`/emergency/doctor?patientId=${data.patientId}`)
+            router.push(`/er/clinic`)
           }
         }
       } catch {
@@ -96,22 +102,15 @@ export default function GlobalScannerProvider({ children }: { children: ReactNod
     <>
       {children}
 
-      {scannerEnabled && (
-        <div className="fixed bottom-4 left-4 z-[200] flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-400 backdrop-blur-sm">
-          <ScanLine className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Scanner ready</span>
-        </div>
-      )}
-
       {scanToast && (
-        <div className="fixed bottom-14 left-4 z-[200] flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-4 py-2.5 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-sm">
+        <div className="fixed bottom-14 right-4 z-[200] flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-4 py-2.5 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-sm">
           <ScanLine className="h-4 w-4" />
           {scanToast}
         </div>
       )}
 
       {scanError && (
-        <div className="fixed bottom-14 left-4 z-[200] flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/20 px-4 py-2.5 text-sm font-medium text-rose-200 shadow-lg backdrop-blur-sm">
+        <div className="fixed bottom-14 right-4 z-[200] flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/20 px-4 py-2.5 text-sm font-medium text-rose-200 shadow-lg backdrop-blur-sm">
           <X className="h-4 w-4" />
           {scanError}
         </div>

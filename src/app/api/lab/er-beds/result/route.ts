@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +19,73 @@ interface ResultEntry {
   completedAt?: string
   attachmentPath?: string
   technicianNotes?: string
+  releasedToDoctorAt?: string
+}
+
+async function addResultBillingItem(params: {
+  visitId: string
+  patientId: string
+  generatedBy: string
+  department: DiagnosticDepartment
+  testLabel: string
+  resultAt: string
+}) {
+  const { visitId, patientId, generatedBy, department, testLabel, resultAt } = params
+  const serviceType = mapTestToServiceType(testLabel, department === 'Lab' ? 'Lab' : department === 'Sonar' ? 'Sonar' : 'Radiology')
+  const price = getDefaultPrice(serviceType)
+  const marker = `[DIAG_RESULT:${department}:${resultAt}]`
+  const description = `${department} Result Processing Fee: ${testLabel} ${marker}`
+
+  let bill = await prisma.bill.findUnique({ where: { visitId } })
+  if (!bill) {
+    bill = await prisma.bill.create({
+      data: {
+        visitId,
+        patientId,
+        generatedBy,
+        items: [],
+        subtotal: 0,
+        tax: 0,
+        discount: 0,
+        total: 0,
+        paymentStatus: 'Pending',
+      },
+    })
+  }
+
+  const items =
+    (bill.items as Array<{ description?: string; total?: number; department?: string; quantity?: number; unitPrice?: number; addedAt?: string; addedBy?: string }>) ||
+    []
+  if (items.some((item) => String(item.description || '').includes(marker))) return
+
+  const nextItems = [
+    ...items,
+    {
+      department,
+      description,
+      quantity: 1,
+      unitPrice: price,
+      total: price,
+      addedAt: new Date().toISOString(),
+      addedBy: generatedBy,
+    },
+  ]
+  const subtotal = nextItems.reduce((sum, item) => sum + Number(item.total || 0), 0)
+  const total = subtotal + Number(bill.tax ?? 0) - Number(bill.discount ?? 0)
+  await prisma.bill.update({
+    where: { id: bill.id },
+    data: { items: nextItems, subtotal, total, updatedAt: new Date() },
+  })
+}
+
+async function resolveBillGeneratorId(preferredId?: string | null) {
+  if (preferredId && preferredId.trim()) return preferredId.trim()
+  const fallbackUser = await prisma.user.findFirst({
+    where: { role: { in: ['ADMIN', 'DOCTOR'] } },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  return fallbackUser?.id || ''
 }
 
 // POST /api/lab/er-beds/result - Save diagnostic result (Lab / Radiology / Sonar) with optional file
@@ -37,7 +104,7 @@ export async function POST(request: Request) {
       department === 'Radiology' || department === 'Sonar' || department === 'ECG' ? department : 'Lab'
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, notes: true, status: true },
+      select: { id: true, notes: true, patientId: true, doctorId: true },
     })
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
 
@@ -49,7 +116,7 @@ export async function POST(request: Request) {
     const existing = (parsed[key] as ResultEntry[]) || []
     const completedAt = new Date().toISOString()
     const isImaging = dept === 'Radiology' || dept === 'Sonar' || dept === 'ECG'
-    existing.push({
+    const newEntry: ResultEntry = {
       at: at || undefined,
       testType: testType || undefined,
       result: resultText || '(See attachment)',
@@ -59,12 +126,40 @@ export async function POST(request: Request) {
         typeof technicianNotes === 'string' && technicianNotes.trim()
           ? technicianNotes.trim()
           : undefined,
-    })
+    }
+
+    const hasOrderAt = at != null && String(at).trim().length > 0
+    let nextResults: ResultEntry[]
+    if (isImaging && hasOrderAt) {
+      const i = existing.findIndex((r) => String(r.at) === String(at))
+      if (i >= 0) {
+        const prev = existing[i]
+        const prevReleased =
+          typeof prev.releasedToDoctorAt === 'string' && prev.releasedToDoctorAt.trim()
+            ? prev.releasedToDoctorAt.trim()
+            : undefined
+        nextResults = [...existing]
+        nextResults[i] = {
+          ...prev,
+          ...newEntry,
+          at: prev.at || newEntry.at,
+          releasedToDoctorAt: prevReleased,
+        }
+      } else {
+        nextResults = [...existing, newEntry]
+      }
+    } else {
+      nextResults = [...existing, newEntry]
+    }
 
     const erOrders = (parsed.erOrders as Array<{ at?: string; type?: string; status?: string }>) || []
-    const updatedErOrders = isImaging
-      ? erOrders
-      : erOrders.map((order) => (String(order.at) === String(at) ? { ...order, status: 'COMPLETED' } : order))
+    const updatedErOrders = hasOrderAt
+      ? erOrders.map((order) =>
+          String(order.at) === String(at) ? { ...order, status: 'COMPLETED' } : order
+        )
+      : isImaging
+        ? erOrders
+        : erOrders.map((order) => (String(order.at) === String(at) ? { ...order, status: 'COMPLETED' } : order))
     parsed.erOrders = updatedErOrders
 
     const lastResultAt = (parsed.lastResultAt as Record<string, string>) || {}
@@ -73,16 +168,29 @@ export async function POST(request: Request) {
     }
     parsed.lastResultAt = lastResultAt
 
-    const wasOutForTest = visit.status === VisitStatus.OUT_FOR_TEST
+    const referenceAt = at || completedAt
+    const testLabel = testType || dept
+    const generatorId = await resolveBillGeneratorId(visit.doctorId || null)
+    if (!generatorId) {
+      return NextResponse.json({ error: 'No valid billing user available' }, { status: 500 })
+    }
+    await addResultBillingItem({
+      visitId,
+      patientId: visit.patientId,
+      generatedBy: generatorId,
+      department: dept,
+      testLabel,
+      resultAt: referenceAt,
+    })
+
     await prisma.visit.update({
       where: { id: visitId },
       data: {
-        notes: JSON.stringify({ ...parsed, [key]: existing }),
-        ...(!isImaging && wasOutForTest && { status: VisitStatus.COMPLETED }),
+        notes: JSON.stringify({ ...parsed, [key]: nextResults }),
         updatedAt: new Date(),
       },
     })
-    return NextResponse.json({ success: true, completedAt, statusUpdatedToReadyForReview: wasOutForTest })
+    return NextResponse.json({ success: true, completedAt, statusUpdatedToReadyForReview: false })
   } catch (e: unknown) {
     const err = e as Error
     console.error('Error saving lab result:', err)

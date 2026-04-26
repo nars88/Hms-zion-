@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 const visitSelect = {
   id: true,
+  patientId: true,
   visitDate: true,
   chiefComplaint: true,
   notes: true,
@@ -32,10 +34,44 @@ const visitSelect = {
 
 type VisitRow = Awaited<ReturnType<typeof prisma.visit.findMany<{ select: typeof visitSelect }>>>[number]
 
+type ResultRow = { releasedToDoctorAt?: string }
+
+function parseVisitNotes(notes: string | null): Record<string, unknown> {
+  if (!notes) return {}
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function hasReleasedResult(rows: unknown): boolean {
+  if (!Array.isArray(rows)) return false
+  return rows.some((r) => Boolean((r as ResultRow)?.releasedToDoctorAt))
+}
+
+function isEmergencyVitals(vitals: VisitRow['vitals'][number] | undefined): boolean {
+  if (!vitals) return false
+  if (typeof vitals.temperature === 'number' && vitals.temperature > 38.5) return true
+  const bp = String(vitals.bp || '').trim()
+  const m = bp.match(/^(\d{2,3})\s*\/\s*(\d{2,3})$/)
+  if (!m) return false
+  const systolic = Number(m[1])
+  const diastolic = Number(m[2])
+  if (!Number.isFinite(systolic) || !Number.isFinite(diastolic)) return false
+  return systolic >= 180 || systolic <= 90 || diastolic >= 120 || diastolic <= 60
+}
+
 function mapVisitToQueueItem(v: VisitRow) {
   if (!v.patient) return null
   const p = v.patient
   const latestVitals = v.vitals[0]
+  const parsedNotes = parseVisitNotes(v.notes)
+  const hasReadyResults =
+    hasReleasedResult(parsedNotes.labResults) ||
+    hasReleasedResult(parsedNotes.radiologyResults) ||
+    hasReleasedResult(parsedNotes.sonarResults)
   let age: number | null = null
   if (p.dateOfBirth) {
     const today = new Date()
@@ -48,6 +84,23 @@ function mapVisitToQueueItem(v: VisitRow) {
   const isEr = (v.chiefComplaint || '').toLowerCase().includes('emergency') || (v.chiefComplaint || '').toLowerCase().includes('er')
   const billPaid = (v.bill as { paymentStatus?: string })?.paymentStatus === 'Paid'
   const medsDispensed = (v.notes || '').includes('Medications dispensed') || (v.notes || '').includes('dispensed')
+  const urgencyLevel =
+    p.triageLevel != null && p.triageLevel <= 2
+      ? 'EMERGENCY'
+      : isEmergencyVitals(latestVitals)
+        ? 'EMERGENCY'
+        : p.triageLevel === 3
+          ? 'MODERATE'
+          : 'NORMAL'
+  const workflowStatus =
+    v.status === VisitStatus.READY_FOR_REVIEW || hasReadyResults
+      ? 'RESULTS_READY'
+      : v.status === VisitStatus.OUT_FOR_TEST
+        ? 'WAITING_RESULTS'
+        : v.status === VisitStatus.In_Consultation
+          ? 'IN_CONSULTATION'
+          : 'WAITING_EXAM'
+
   return {
     visitId: v.id,
     patientId: p.id,
@@ -56,8 +109,11 @@ function mapVisitToQueueItem(v: VisitRow) {
     gender: p.gender,
     phone: p.phone,
     chiefComplaint: v.chiefComplaint,
+    waitingSince: v.visitDate,
     triageLevel: p.triageLevel,
     allergies: p.allergies,
+    urgencyLevel,
+    workflowStatus,
     vitals: latestVitals
       ? {
           bp: latestVitals.bp,
@@ -70,24 +126,19 @@ function mapVisitToQueueItem(v: VisitRow) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     // Waiting for doctor / nurse workup: vitals, ER chief complaint, or any checked-in visit with a complaint (clinic).
     const waitingWhere = {
       status: VisitStatus.Waiting,
-      NOT: {
-        OR: [
-          { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' as const } },
-          { chiefComplaint: { contains: 'ER', mode: 'insensitive' as const } },
-        ],
-      },
-      OR: [
-        { vitals: { some: {} } },
-        { chiefComplaint: { not: null } },
-      ],
+      OR: [{ vitals: { some: {} } }, { chiefComplaint: { not: null } }],
     }
 
-    const [waitingVisits, readyForReviewVisits, inProgressVisits] = await Promise.all([
+    const [waitingVisits, outForTestVisits, readyForReviewVisits, inProgressVisits] = await Promise.all([
       prisma.visit.findMany({
         where: waitingWhere,
         orderBy: [
@@ -98,13 +149,14 @@ export async function GET() {
       }),
       prisma.visit.findMany({
         where: {
+          status: VisitStatus.OUT_FOR_TEST,
+        },
+        orderBy: { updatedAt: 'asc' },
+        select: visitSelect,
+      }),
+      prisma.visit.findMany({
+        where: {
           status: VisitStatus.READY_FOR_REVIEW,
-          NOT: {
-            OR: [
-              { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' as const } },
-              { chiefComplaint: { contains: 'ER', mode: 'insensitive' as const } },
-            ],
-          },
         },
         orderBy: { updatedAt: 'asc' },
         select: visitSelect,
@@ -112,19 +164,13 @@ export async function GET() {
       prisma.visit.findMany({
         where: {
           status: VisitStatus.In_Consultation,
-          NOT: {
-            OR: [
-              { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' as const } },
-              { chiefComplaint: { contains: 'ER', mode: 'insensitive' as const } },
-            ],
-          },
         },
         orderBy: { updatedAt: 'desc' },
         select: visitSelect,
       }),
     ])
 
-    const queue = waitingVisits.map(mapVisitToQueueItem).filter(Boolean)
+    const queue = [...waitingVisits, ...outForTestVisits].map(mapVisitToQueueItem).filter(Boolean)
     const readyForReview = readyForReviewVisits.map(mapVisitToQueueItem).filter(Boolean)
     const inProgress = inProgressVisits.map(mapVisitToQueueItem).filter(Boolean)
 

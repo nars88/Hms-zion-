@@ -149,12 +149,33 @@ export default function AppointmentBookingModal({
       })
 
       if (result.success) {
-        // Generate standardized Visit ID (ZION-YYYYMMDD-XXXX format)
-        const visitId = generateVisitId()
+        // Silent backend save for Step 2 doctor selection (no UI flow changes)
+        let visitId = generateVisitId()
         
         // Extract queue number from Visit ID (last 4 digits)
-        const queueNumberMatch = visitId.match(/-(\d{4})$/)
-        const queueNumber = queueNumberMatch ? parseInt(queueNumberMatch[1], 10) : 0
+        let queueNumberMatch = visitId.match(/-(\d{4})$/)
+        let queueNumber = queueNumberMatch ? parseInt(queueNumberMatch[1], 10) : 0
+
+        try {
+          const saveRes = await fetch('/api/reception/clinic-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              patientId: finalPatientId,
+              doctorName: selectedDoctorData?.name || 'General Clinic',
+              appointmentDate,
+              appointmentTime,
+            }),
+          })
+          const saveData = await saveRes.json().catch(() => ({}))
+          if (saveRes.ok && saveData?.visit?.id) {
+            visitId = String(saveData.visit.id)
+            // use last 4 chars as stable numeric-ish queue fallback for existing QR UI
+            queueNumber = Number.parseInt(visitId.slice(-4).replace(/\D/g, ''), 10) || queueNumber
+          }
+        } catch {
+          // fallback to generated id to keep old flow uninterrupted
+        }
         
         // Create pending invoice with this Visit ID (Booking-to-Invoice Link)
         createInvoice(finalPatientId, finalPatientName, visitId)
@@ -183,9 +204,6 @@ export default function AppointmentBookingModal({
           console.error('Error creating pending invoice:', error)
         }
         
-        console.log(`[Appointment Booking] Visit ID created: ${visitId} for patient: ${finalPatientName}`)
-        console.log(`[Appointment Booking] Pending invoice created - Accountant can see patient as 'In Progress'`)
-
         // CORE WORKFLOW: REGISTER -> ASSIGN -> QR
         // Immediately trigger QR/Print flow in parent when provided.
         if (onBookingSuccess) {

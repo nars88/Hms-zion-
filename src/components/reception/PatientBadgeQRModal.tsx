@@ -81,7 +81,7 @@ export default function PatientBadgeQRModal({
     }
 
     fetchStatus()
-    timer = window.setInterval(fetchStatus, 5000)
+    timer = window.setInterval(fetchStatus, 15000)
 
     return () => {
       alive = false

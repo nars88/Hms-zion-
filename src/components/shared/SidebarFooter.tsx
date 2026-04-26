@@ -1,6 +1,5 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LogOut } from 'lucide-react'
 import ThemeLanguageToggles from './ThemeLanguageToggles'
@@ -10,7 +9,6 @@ import ThemeLanguageToggles from './ThemeLanguageToggles'
  * Used in Admin, Doctor, Emergency, and all other layouts.
  */
 export default function SidebarFooter() {
-  useAuth() // auth present for consistency; sign-out clears storage + redirects without calling logout to avoid ER auto-login
   const { t } = useLanguage()
 
   const handleSignOut = () => {

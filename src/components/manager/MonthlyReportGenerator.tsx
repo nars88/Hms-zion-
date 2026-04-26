@@ -2,12 +2,50 @@
 
 import { useState } from 'react'
 import { FileText, Download, Loader2 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { useCentralizedBilling } from '@/contexts/CentralizedBillingContext'
 import { useVisitData } from '@/contexts/VisitDataContext'
 import { useWaitingList } from '@/contexts/WaitingListContext'
 
 interface MonthlyReportGeneratorProps {
   onReportGenerated?: () => void
+}
+
+interface ReportMetrics {
+  totalRevenue: number
+  totalPending: number
+  patientCount: number
+  totalInvoices: number
+  paidInvoices: number
+  partialInvoices: number
+  pendingInvoices: number
+}
+
+interface ReportData {
+  month: string
+  generatedAt: string
+  metrics: ReportMetrics
+  invoices: Array<Record<string, unknown>>
+  visits: Array<Record<string, unknown>>
+}
+
+const formatIQD = (value: number) => `${value.toLocaleString('en-US')} IQD`
+
+const safeDate = (value: unknown) => {
+  if (!value) return '-'
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('en-US')
+}
+
+const getReportFileName = (extension: 'pdf' | 'xlsx') => {
+  const now = new Date()
+  const day = String(now.getDate()).padStart(2, '0')
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const year = now.getFullYear()
+  return `zion_monthly_report_${day}-${month}-${year}.${extension}`
 }
 
 /**
@@ -94,8 +132,61 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
       return
     }
 
-    // In production, use a library like jsPDF or html2pdf
-    alert('PDF Export functionality will be implemented with jsPDF library')
+    const parsed = JSON.parse(reportData) as ReportData
+    const doc = new jsPDF()
+
+    doc.setFontSize(18)
+    doc.text('ZION MED - Monthly Report', 14, 18)
+    doc.setFontSize(11)
+    doc.text(`Month: ${parsed.month}`, 14, 26)
+    doc.text(`Generated: ${new Date(parsed.generatedAt).toLocaleString('en-US')}`, 14, 32)
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Total Revenue', formatIQD(parsed.metrics.totalRevenue)],
+        ['Total Pending', formatIQD(parsed.metrics.totalPending)],
+        ['Patient Visits', String(parsed.metrics.patientCount)],
+        ['Total Invoices', String(parsed.metrics.totalInvoices)],
+        ['Paid Invoices', String(parsed.metrics.paidInvoices)],
+        ['Partial Invoices', String(parsed.metrics.partialInvoices)],
+        ['Pending Invoices', String(parsed.metrics.pendingInvoices)],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [8, 145, 178] },
+    })
+
+    const invoiceRows = parsed.invoices.map((invoice) => ({
+      id: String(invoice.id ?? invoice.invoiceNumber ?? '-'),
+      patient: String(invoice.patientName ?? invoice.patientId ?? '-'),
+      status: String(invoice.status ?? '-'),
+      paid: Number(invoice.paidAmount ?? 0),
+      remaining: Number(invoice.remainingAmount ?? 0),
+      createdAt: safeDate(invoice.createdAt),
+    }))
+
+    autoTable(doc, {
+      startY: (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY
+        ? ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable!.finalY as number) + 10
+        : 90,
+      head: [['Invoice', 'Patient', 'Status', 'Paid', 'Remaining', 'Created']],
+      body: invoiceRows.length
+        ? invoiceRows.map((row) => [
+            row.id,
+            row.patient,
+            row.status,
+            formatIQD(row.paid),
+            formatIQD(row.remaining),
+            row.createdAt,
+          ])
+        : [['-', '-', 'No invoices this month', '-', '-', '-']],
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 9 },
+    })
+
+    doc.save(getReportFileName('pdf'))
   }
 
   const exportToExcel = () => {
@@ -105,8 +196,45 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
       return
     }
 
-    // In production, use a library like xlsx
-    alert('Excel Export functionality will be implemented with xlsx library')
+    const parsed = JSON.parse(reportData) as ReportData
+
+    const metricsSheet = XLSX.utils.json_to_sheet([
+      { Metric: 'Month', Value: parsed.month },
+      { Metric: 'Generated At', Value: new Date(parsed.generatedAt).toLocaleString('en-US') },
+      { Metric: 'Total Revenue', Value: parsed.metrics.totalRevenue },
+      { Metric: 'Total Pending', Value: parsed.metrics.totalPending },
+      { Metric: 'Patient Visits', Value: parsed.metrics.patientCount },
+      { Metric: 'Total Invoices', Value: parsed.metrics.totalInvoices },
+      { Metric: 'Paid Invoices', Value: parsed.metrics.paidInvoices },
+      { Metric: 'Partial Invoices', Value: parsed.metrics.partialInvoices },
+      { Metric: 'Pending Invoices', Value: parsed.metrics.pendingInvoices },
+    ])
+
+    const invoicesSheet = XLSX.utils.json_to_sheet(
+      parsed.invoices.map((invoice) => ({
+        InvoiceID: String(invoice.id ?? invoice.invoiceNumber ?? '-'),
+        Patient: String(invoice.patientName ?? invoice.patientId ?? '-'),
+        Status: String(invoice.status ?? '-'),
+        PaidAmount: Number(invoice.paidAmount ?? 0),
+        RemainingAmount: Number(invoice.remainingAmount ?? 0),
+        CreatedAt: safeDate(invoice.createdAt),
+      }))
+    )
+
+    const visitsSheet = XLSX.utils.json_to_sheet(
+      parsed.visits.map((visit) => ({
+        VisitID: String(visit.id ?? '-'),
+        PatientID: String(visit.patientId ?? '-'),
+        CompletedAt: safeDate(visit.completedAt),
+        Status: String(visit.status ?? '-'),
+      }))
+    )
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, metricsSheet, 'Summary')
+    XLSX.utils.book_append_sheet(wb, invoicesSheet, 'Invoices')
+    XLSX.utils.book_append_sheet(wb, visitsSheet, 'Visits')
+    XLSX.writeFile(wb, getReportFileName('xlsx'))
   }
 
   return (

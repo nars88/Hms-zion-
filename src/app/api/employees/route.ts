@@ -15,7 +15,7 @@ const DEPT_ROLE_MAP: Record<string, string[]> = {
   security: ['SECURITY'],
   accounting: ['ACCOUNTANT'],
   intake: ['INTAKE_NURSE', 'ER_NURSE'],
-  emergency: ['ER_NURSE', 'DOCTOR'],
+  emergency: ['ER_NURSE', 'ER_INTAKE_NURSE', 'DOCTOR'],
 }
 
 // GET /api/employees - Fetch all employees (with department name when linked)

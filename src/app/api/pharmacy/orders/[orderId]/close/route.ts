@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { MedicationOrderStatus } from '@prisma/client'
+import { MedicationOrderStatus, VisitStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +17,9 @@ export async function POST(
 
     const order = await prisma.medicationOrder.findUnique({
       where: { id: orderId },
+      include: {
+        visit: { include: { bill: true } },
+      },
     })
 
     if (!order) {
@@ -30,10 +33,43 @@ export async function POST(
       )
     }
 
-    await prisma.medicationOrder.update({
-      where: { id: orderId },
-      data: { status: MedicationOrderStatus.CLOSED },
-    })
+    if (order.visit.bill) {
+      const existingItems = (order.visit.bill.items as Array<{ department?: string; total?: number }>) || []
+      const keptItems = existingItems.filter((it) => String(it.department || '').toLowerCase() !== 'pharmacy')
+      const subtotal = keptItems.reduce((sum, it) => sum + (Number(it.total) || 0), 0)
+      const total = subtotal + Number(order.visit.bill.tax ?? 0) - Number(order.visit.bill.discount ?? 0)
+      await prisma.$transaction([
+        prisma.medicationOrder.update({
+          where: { id: orderId },
+          data: { status: MedicationOrderStatus.CLOSED },
+        }),
+        prisma.visit.update({
+          where: { id: order.visitId },
+          data: { status: VisitStatus.Billing, updatedAt: new Date() },
+        }),
+        prisma.bill.update({
+          where: { id: order.visit.bill.id },
+          data: {
+            items: keptItems,
+            subtotal,
+            total,
+            qrStatus: 'LOCKED',
+            updatedAt: new Date(),
+          },
+        }),
+      ])
+    } else {
+      await prisma.$transaction([
+        prisma.medicationOrder.update({
+          where: { id: orderId },
+          data: { status: MedicationOrderStatus.CLOSED },
+        }),
+        prisma.visit.update({
+          where: { id: order.visitId },
+          data: { status: VisitStatus.Billing, updatedAt: new Date() },
+        }),
+      ])
+    }
 
     return NextResponse.json({
       success: true,

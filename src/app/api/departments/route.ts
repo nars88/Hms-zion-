@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
+import { MEDICAL_SPECIALTIES } from '@/lib/departmentSpecialties'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,8 +30,35 @@ function parseEmployeeIds(value: unknown): string[] {
   return []
 }
 
+async function ensureMedicalSpecialtiesExist() {
+  for (const specialty of MEDICAL_SPECIALTIES) {
+    const id = crypto.randomUUID()
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO departments (id, name, description, color, employee_ids)
+       VALUES ($1, $2, $3, $4, '[]'::jsonb)
+       ON CONFLICT (name) DO NOTHING`,
+      id,
+      specialty.english,
+      specialty.description,
+      specialty.color
+    )
+  }
+}
+
+let specialtiesEnsureStarted = false
+function ensureMedicalSpecialtiesInBackground() {
+  if (specialtiesEnsureStarted) return
+  specialtiesEnsureStarted = true
+  void ensureMedicalSpecialtiesExist().catch((error) => {
+    specialtiesEnsureStarted = false
+    console.error('❌ Failed ensuring medical specialties:', error)
+  })
+}
+
 export async function GET() {
   try {
+    // Keep API fast: seed specialties in background, do not block response.
+    ensureMedicalSpecialtiesInBackground()
     const rows = await prisma.$queryRawUnsafe<DeptRow[]>(
       `SELECT id, name, description, color, head_employee_id, hod_name, hod_tag, employee_ids, created_at
        FROM departments
@@ -61,6 +90,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     const body = await request.json().catch(() => ({}))
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     const description = typeof body?.description === 'string' ? body.description.trim() : ''

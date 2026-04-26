@@ -12,6 +12,7 @@ export interface MedicalReceiptProps {
   onConfirmPayment?: () => void
   onDischarge?: () => void
   isDischarging?: boolean
+  isConfirmingPayment?: boolean
   allowConfirmPayment?: boolean
   className?: string
 }
@@ -25,6 +26,7 @@ export default function MedicalReceipt({
   onConfirmPayment,
   onDischarge,
   isDischarging = false,
+  isConfirmingPayment = false,
   allowConfirmPayment = true,
   className = '',
 }: MedicalReceiptProps) {
@@ -123,9 +125,13 @@ export default function MedicalReceipt({
               {isPaid ? 'Print Receipt' : 'Print Invoice'}
             </button>
             {showPaymentActions && !isPaid && allowConfirmPayment && (
-              <button onClick={onConfirmPayment} className="px-6 py-3 text-base font-bold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 flex items-center gap-2">
+              <button
+                onClick={onConfirmPayment}
+                disabled={isConfirmingPayment}
+                className="px-6 py-3 text-base font-bold bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 flex items-center gap-2 disabled:opacity-50"
+              >
                 <CheckCircle size={20} />
-                Confirm Payment
+                {isConfirmingPayment ? 'Processing...' : 'Confirm Payment'}
               </button>
             )}
             {showPaymentActions && showPaidSection && (

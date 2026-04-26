@@ -16,10 +16,20 @@ export default function ProtectedRoute({
   allowedRoles,
   redirectTo = '/',
 }: ProtectedRouteProps) {
-  const { user, hasAnyRole } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const [isChecking, setIsChecking] = useState(true)
+  const [showRecovery, setShowRecovery] = useState(false)
   const didRedirectRef = useRef(false)
+
+  useEffect(() => {
+    if (!isChecking) {
+      setShowRecovery(false)
+      return
+    }
+    const id = window.setTimeout(() => setShowRecovery(true), 3000)
+    return () => window.clearTimeout(id)
+  }, [isChecking])
 
   useEffect(() => {
     // Check authentication first
@@ -41,19 +51,23 @@ export default function ProtectedRoute({
       return
     }
 
-    // ADMIN OVERRIDE: Check if admin is accessing with override flag
+    // ADMIN OVERRIDE: allows admin to view any department page
+    // This is UI-only — server APIs still enforce their own auth
+    // Do not use this for security-sensitive features
     const adminOverride = typeof window !== 'undefined' ? sessionStorage.getItem('adminOverride') : null
     const isAdminOverride = adminOverride === 'true' && user.role === 'ADMIN'
 
     // Check role authorization (allow if admin override is active)
-    if (!hasAnyRole(allowedRoles) && !isAdminOverride) {
+    const hasAccess = allowedRoles.includes(user.role)
+    if (!hasAccess && !isAdminOverride) {
       // Redirect to appropriate dashboard based on user role
+      setIsChecking(false)
       router.replace(redirectTo)
       return
     }
 
     setIsChecking(false)
-  }, [user, allowedRoles, hasAnyRole, router, redirectTo])
+  }, [user, allowedRoles, router, redirectTo])
 
   if (isChecking) {
     return (
@@ -61,6 +75,15 @@ export default function ProtectedRoute({
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-500 border-t-transparent mx-auto mb-4"></div>
           <p className="text-sm text-secondary">Loading...</p>
+          {showRecovery ? (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-lg border border-slate-600/70 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800/60"
+            >
+              Reload
+            </button>
+          ) : null}
         </div>
       </div>
     )
@@ -70,11 +93,14 @@ export default function ProtectedRoute({
     return null // Will redirect to login
   }
 
-  // ADMIN OVERRIDE: Allow access if admin override is active
+  // ADMIN OVERRIDE: allows admin to view any department page
+  // This is UI-only — server APIs still enforce their own auth
+  // Do not use this for security-sensitive features
   const adminOverride = typeof window !== 'undefined' ? sessionStorage.getItem('adminOverride') : null
   const isAdminOverride = adminOverride === 'true' && user?.role === 'ADMIN'
 
-  if (!hasAnyRole(allowedRoles) && !isAdminOverride) {
+  const hasAccess = allowedRoles.includes(user.role)
+  if (!hasAccess && !isAdminOverride) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0B1120]">
         <div className="glass rounded-xl border border-rose-500/30 p-8 max-w-md text-center relative overflow-hidden">

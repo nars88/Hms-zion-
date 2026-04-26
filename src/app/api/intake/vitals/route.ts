@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +11,17 @@ interface VitalsBody {
   temperature: number
   heartRate: number
   weight: number
+  oxygen?: number
   allergies: string
   triageLevel: number
 }
 
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json()) as VitalsBody
     const {
       patientId,
@@ -24,6 +30,7 @@ export async function POST(request: Request) {
       temperature,
       heartRate,
       weight,
+      oxygen,
       allergies,
       triageLevel,
     } = body
@@ -66,6 +73,13 @@ export async function POST(request: Request) {
       )
     }
 
+    if (oxygen != null && (!Number.isFinite(oxygen) || oxygen < 50 || oxygen > 100)) {
+      return NextResponse.json(
+        { error: 'Oxygen saturation must be between 50 and 100.' },
+        { status: 400 }
+      )
+    }
+
     // Ensure visit belongs to patient
     const visit = await prisma.visit.findFirst({
       where: {
@@ -81,30 +95,63 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create vitals record
-    await prisma.vitals.create({
-      data: {
-        patientId,
-        visitId,
-        bp,
-        temperature,
-        heartRate,
-        weight,
-      },
+    // Create vitals record and update visit snapshot in one transaction.
+    await prisma.$transaction(async (tx) => {
+      await tx.vitals.create({
+        data: {
+          patientId,
+          visitId,
+          bp,
+          temperature,
+          heartRate,
+          weight,
+          recordedBy: user.id,
+        },
+      })
+
+      // Keep visit in Waiting so it appears in doctor queue, but mark intake completion.
+      const intakeSnapshot = {
+        intakeCompletedAt: new Date().toISOString(),
+        intakeCompletedBy: user.id,
+        oxygen: oxygen ?? null,
+      }
+
+      let nextNotes: string
+      if (!visit.notes) {
+        nextNotes = JSON.stringify(intakeSnapshot)
+      } else {
+        try {
+          const parsed = JSON.parse(visit.notes)
+          if (parsed && typeof parsed === 'object') {
+            nextNotes = JSON.stringify({ ...parsed, ...intakeSnapshot })
+          } else {
+            nextNotes = JSON.stringify({ previousNotes: String(visit.notes), ...intakeSnapshot })
+          }
+        } catch {
+          nextNotes = JSON.stringify({ previousNotes: String(visit.notes), ...intakeSnapshot })
+        }
+      }
+
+      await tx.visit.update({
+        where: { id: visitId },
+        data: {
+          status: visit.status,
+          notes: nextNotes,
+        },
+      })
+
+      // Update patient snapshot with allergies & triage level.
+      await tx.patient.update({
+        where: { id: patientId },
+        data: {
+          allergies,
+          triageLevel,
+        },
+      })
     })
 
-    // Update patient snapshot with allergies & triage level
-    await prisma.patient.update({
-      where: { id: patientId },
-      data: {
-        allergies,
-        triageLevel,
-      },
-    })
-
-    return NextResponse.json({ success: true }, { status: 201 })
-  } catch (error) {
-    console.error('❌ Error saving vitals for intake:', error)
+    return NextResponse.json({ success: true, transitionedToDoctorQueue: true }, { status: 201 })
+  } catch {
     return NextResponse.json(
       { error: 'Failed to save vitals.' },
       { status: 500 }
