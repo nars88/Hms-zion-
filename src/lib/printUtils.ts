@@ -264,7 +264,7 @@ export const printPharmacyDispensing = (
         </ul>
       </div>
       <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-left: 4px solid #1E40AF;">
-        <p style="font-size: 9pt; color: #666; margin-bottom: 5px;"><strong>Dispensed by:</strong> ZION Hospital Pharmacy</p>
+        <p style="font-size: 9pt; color: #666; margin-bottom: 5px;"><strong>Dispensed by:</strong> NARS Hospital Pharmacy</p>
         <p style="font-size: 9pt; color: #666;">Date: ${options.date || new Date().toLocaleDateString('en-US')}</p>
       </div>
     `,

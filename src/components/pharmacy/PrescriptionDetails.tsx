@@ -206,7 +206,7 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || 'Failed to dispense')
       }
-      alert('تم الصرف. تمت إضافة التكلفة إلى فاتورة الزيارة.\nDispensed. Cost added to visit invoice.')
+      alert('Dispensed. Cost added to visit invoice.')
       onBack()
     } catch (e: unknown) {
       alert((e as Error)?.message || 'Failed to dispense')
@@ -518,7 +518,7 @@ export default function PrescriptionDetails({ prescription, onBack }: Prescripti
                         className="w-full px-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <CheckCircle size={20} />}
-                        <span>Dispense (صرف)</span>
+                        <span>Dispense</span>
                       </button>
                       <button
                         onClick={handleOrderOutOfStock}

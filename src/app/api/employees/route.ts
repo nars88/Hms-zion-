@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { syncUserDepartmentLink, verifyDepartmentExists } from '@/lib/departmentEmployeeSync'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { writeAuditLog } from '@/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +23,10 @@ const DEPT_ROLE_MAP: Record<string, string[]> = {
 // GET /api/employees - Fetch all employees (with department name when linked)
 export async function GET(request: Request) {
   try {
+    const requester = await getRequestUser(request)
+    if (!requester) return unauthorized()
+    if (requester.role !== 'ADMIN') return forbidden()
+
     const { searchParams } = new URL(request.url)
     const departmentType = searchParams.get('departmentType')?.toLowerCase() ?? ''
     const roles = DEPT_ROLE_MAP[departmentType]
@@ -102,6 +108,10 @@ export async function GET(request: Request) {
 // POST /api/employees - Create new employee (department required)
 export async function POST(request: Request) {
   try {
+    const requester = await getRequestUser(request)
+    if (!requester) return unauthorized()
+    if (requester.role !== 'ADMIN') return forbidden()
+
     const body = await request.json()
     const {
       name,
@@ -164,6 +174,13 @@ export async function POST(request: Request) {
     })
 
     await syncUserDepartmentLink(user.id, deptId)
+
+    await writeAuditLog(prisma, {
+      actor: requester,
+      request,
+      action: `Created employee: ${user.email} (${user.role})`,
+      metadata: { employeeId: user.id, email: user.email, role: user.role, name: user.name },
+    })
 
     return NextResponse.json({
       success: true,

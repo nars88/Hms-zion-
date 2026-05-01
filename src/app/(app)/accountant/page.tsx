@@ -69,6 +69,13 @@ export default function AccountantDashboard() {
         const firstName = nameParts[0] || 'Unknown'
         const lastName = nameParts.slice(1).join(' ') || 'Patient'
         
+        const subtotal = Number(bill.bill.subtotal) || 0
+        const tax = Number(bill.bill.tax) || 0
+        const discount = Number(bill.bill.discount) || 0
+        const rawTotal = Number(bill.bill.total)
+        const computedTotal = subtotal + tax - discount
+        const safeTotal = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : computedTotal
+
         return {
           id: bill.bill.id,
           visitId: bill.visitId,
@@ -79,10 +86,10 @@ export default function AccountantDashboard() {
             phone: bill.patientPhone || '',
           },
           items: bill.bill.items,
-          subtotal: Number(bill.bill.subtotal),
-          tax: Number(bill.bill.tax),
-          discount: Number(bill.bill.discount),
-          total: Number(bill.bill.total),
+          subtotal,
+          tax,
+          discount,
+          total: safeTotal,
           paymentStatus: bill.bill.paymentStatus,
           paymentMethod: bill.bill.paymentMethod,
           qrCode: bill.bill.qrCode,
@@ -90,6 +97,8 @@ export default function AccountantDashboard() {
           paidAt: bill.bill.paidAt,
           createdAt: bill.bill.createdAt,
           updatedAt: bill.bill.updatedAt,
+          hasUndispensedMedications: Boolean(bill.hasUndispensedMedications),
+          undispensedMedicationStatus: bill.undispensedMedicationStatus || null,
         }
       })
       setInvoices(transformedInvoices)
@@ -335,6 +344,11 @@ export default function AccountantDashboard() {
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
               {selectedInvoice ? (
                 <div className="p-1.5 h-full min-h-0 flex flex-col">
+                  {selectedInvoice.hasUndispensedMedications ? (
+                    <div className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                      Note: There are un-dispensed medications in this visit.
+                    </div>
+                  ) : null}
                   <MedicalReceipt
                     invoice={selectedInvoice}
                     onClose={() => setSelectedInvoice(null)}

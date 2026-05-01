@@ -15,7 +15,7 @@ export const ROLE_DASHBOARD_HREF: Record<string, string> = {
   ACCOUNTANT: '/accountant?view=all',
   DOCTOR: '/doctor/queue',
   PHARMACIST: '/pharmacy/dispense',
-  RECEPTIONIST: '/reception',
+  RECEPTIONIST: '/er-reception',
   ER_INTAKE_NURSE: '/er/vitals-station',
   ER_NURSE: '/er/mobile-tasks',
   INTAKE_NURSE: '/intake',
@@ -40,10 +40,15 @@ export interface DepartmentNavItem {
  * Only links that exist in the app; no placeholder or cross-department links.
  */
 export const DEPARTMENT_NAV: Record<string, { roleLabel: string; items: DepartmentNavItem[] }> = {
+  '/er-reception': {
+    roleLabel: 'ER Reception',
+    items: [{ href: '/er-reception', label: 'Register Patient' }],
+  },
   '/reception': {
     roleLabel: 'Reception',
     items: [
       { href: '/reception', label: 'Dashboard' },
+      { href: '/reception/er-quick', label: 'ER Quick Reception' },
     ],
   },
   '/pharmacy': {

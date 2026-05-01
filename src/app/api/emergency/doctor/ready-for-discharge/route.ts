@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,10 @@ const ORDER_TO_RESULTS: Record<string, 'labResults' | 'radiologyResults' | 'sona
 // Checks no pending diagnostics; sets visit to Billing and creates bill so patient appears in Accountant Pending list.
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId } = body
     if (!visitId) {
@@ -23,7 +28,7 @@ export async function POST(request: Request) {
     }
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, patientId: true, notes: true },
+      select: { id: true, patientId: true, notes: true, bedNumber: true },
     })
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
 
@@ -76,9 +81,24 @@ export async function POST(request: Request) {
       })
     }
 
+    let parsedNotes: Record<string, unknown> = {}
+    try {
+      if (visit.notes) parsedNotes = JSON.parse(visit.notes) as Record<string, unknown>
+    } catch {
+      parsedNotes = {}
+    }
+
     await prisma.visit.update({
       where: { id: visitId },
-      data: { status: VisitStatus.Billing, updatedAt: new Date() },
+      data: {
+        status: VisitStatus.Billing,
+        notes: JSON.stringify({
+          ...parsedNotes,
+          bedExitState: visit.bedNumber != null ? 'PENDING_EXIT' : 'AVAILABLE',
+          bedExitMarkedAt: new Date().toISOString(),
+        }),
+        updatedAt: new Date(),
+      },
     })
 
     return NextResponse.json({

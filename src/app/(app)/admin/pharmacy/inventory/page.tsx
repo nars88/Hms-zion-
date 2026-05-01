@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Package, Plus, ArrowLeft, Search, Pencil, Trash2 } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 
-const STORAGE_KEY = 'inventory'
 const DRUG_CATEGORIES = ['Tablets', 'Syrup', 'Injection', 'Capsules', 'Cream', 'Drops', 'Inhaler', 'Other'] as const
 
 interface InventoryRow {
@@ -18,6 +17,19 @@ interface InventoryRow {
   expiryDate: string | null
   batchNumber: string | null
   category: string | null
+}
+
+type DrugDraft = {
+  id: string
+  baseName: string
+  strength: string
+  currentStock: number
+  unit: string
+  pricePerUnit: number
+  minThreshold: number
+  expiryDate: string
+  batchNumber: string
+  category: string
 }
 
 function isExpired(expiryDate: string | null): boolean {
@@ -35,37 +47,26 @@ function isNearExpiry(expiryDate: string | null, days = 30): boolean {
   return exp <= limit
 }
 
-function loadFromStorage(): InventoryRow[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function saveToStorage(items: InventoryRow[]) {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-  } catch {
-    // ignore
-  }
+function splitDrugAndStrength(drugName: string): { baseName: string; strength: string } {
+  const trimmed = String(drugName || '').trim()
+  const m = trimmed.match(/^(.*?)(\s+\d+(?:\.\d+)?\s?(?:mg|g|mcg|ml))$/i)
+  if (!m) return { baseName: trimmed, strength: '' }
+  return { baseName: m[1].trim(), strength: m[2].trim() }
 }
 
 export default function AdminPharmacyInventoryPage() {
   const [list, setList] = useState<InventoryRow[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [restockId, setRestockId] = useState<string | null>(null)
   const [restockQty, setRestockQty] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<InventoryRow>>({})
+  const [editForm, setEditForm] = useState<Partial<DrugDraft>>({})
   const [newDrug, setNewDrug] = useState({
-    drugName: '',
+    baseName: '',
+    strength: '',
     currentStock: '0',
     unit: 'unit',
     pricePerUnit: '',
@@ -75,15 +76,25 @@ export default function AdminPharmacyInventoryPage() {
     category: '',
   })
 
-  useEffect(() => {
-    setList(loadFromStorage())
-    setLoading(false)
-  }, [])
-
-  const persist = (next: InventoryRow[]) => {
-    setList(next)
-    saveToStorage(next)
+  const fetchInventory = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await fetch('/api/pharmacy/inventory', { cache: 'no-store' })
+      const data = await res.json().catch(() => [])
+      if (!res.ok) throw new Error(data?.error || 'Failed to load inventory')
+      setList(Array.isArray(data) ? data : [])
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to load inventory')
+      setList([])
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    void fetchInventory()
+  }, [])
 
   const filteredList = useMemo(() => {
     if (!searchQuery.trim()) return list
@@ -96,50 +107,78 @@ export default function AdminPharmacyInventoryPage() {
     )
   }, [list, searchQuery])
 
-  const handleRestock = (id: string) => {
+  const handleRestock = async (id: string) => {
     const qty = parseInt(restockQty, 10)
     if (!qty || qty < 1) return
-    const next = list.map((row) =>
-      row.id === id ? { ...row, currentStock: row.currentStock + qty } : row
-    )
-    persist(next)
-    setRestockId(null)
-    setRestockQty('')
+    try {
+      setBusy(true)
+      setError(null)
+      const res = await fetch(`/api/pharmacy/inventory/${encodeURIComponent(id)}/restock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantityToAdd: qty }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to restock')
+      await fetchInventory()
+      setRestockId(null)
+      setRestockQty('')
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to restock')
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const handleAddDrug = (e?: React.FormEvent) => {
+  const handleAddDrug = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!newDrug.drugName.trim()) return
-    const newDrugObj: InventoryRow = {
-      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
-      drugName: newDrug.drugName.trim(),
-      currentStock: parseInt(newDrug.currentStock, 10) || 0,
-      unit: newDrug.unit || 'unit',
-      pricePerUnit: parseFloat(newDrug.pricePerUnit) || 0,
-      minThreshold: parseInt(newDrug.minThreshold, 10) || 10,
-      expiryDate: newDrug.expiryDate.trim() || null,
-      batchNumber: newDrug.batchNumber.trim() || null,
-      category: newDrug.category.trim() || null,
+    if (!newDrug.baseName.trim()) return
+    const compositeName = [newDrug.baseName.trim(), newDrug.strength.trim()].filter(Boolean).join(' ')
+    try {
+      setBusy(true)
+      setError(null)
+      const res = await fetch('/api/pharmacy/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drugName: compositeName,
+          currentStock: parseInt(newDrug.currentStock, 10) || 0,
+          unit: newDrug.unit || 'unit',
+          pricePerUnit: parseFloat(newDrug.pricePerUnit) || 0,
+          minThreshold: parseInt(newDrug.minThreshold, 10) || 10,
+          expiryDate: newDrug.expiryDate.trim() || null,
+          batchNumber: newDrug.batchNumber.trim() || null,
+          category: newDrug.category.trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to add drug')
+      await fetchInventory()
+      setNewDrug({
+        baseName: '',
+        strength: '',
+        currentStock: '0',
+        unit: 'unit',
+        pricePerUnit: '',
+        minThreshold: '10',
+        expiryDate: '',
+        batchNumber: '',
+        category: '',
+      })
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to add drug')
+    } finally {
+      setBusy(false)
     }
-    const newUpdatedArray = [...list, newDrugObj]
-    setList(newUpdatedArray)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUpdatedArray))
-    setNewDrug({
-      drugName: '',
-      currentStock: '0',
-      unit: 'unit',
-      pricePerUnit: '',
-      minThreshold: '10',
-      expiryDate: '',
-      batchNumber: '',
-      category: '',
-    })
   }
 
   const handleEdit = (row: InventoryRow) => {
+    const split = splitDrugAndStrength(row.drugName)
     setEditingId(row.id)
     setEditForm({
-      drugName: row.drugName,
+      id: row.id,
+      baseName: split.baseName,
+      strength: split.strength,
       currentStock: row.currentStock,
       unit: row.unit,
       pricePerUnit: row.pricePerUnit,
@@ -150,31 +189,56 @@ export default function AdminPharmacyInventoryPage() {
     })
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingId) return
-    const next = list.map((row) =>
-      row.id === editingId
-        ? {
-            ...row,
-            drugName: (editForm.drugName ?? row.drugName).trim(),
-            currentStock: editForm.currentStock ?? row.currentStock,
-            unit: editForm.unit ?? row.unit,
-            pricePerUnit: editForm.pricePerUnit ?? row.pricePerUnit,
-            minThreshold: editForm.minThreshold ?? row.minThreshold,
-            expiryDate: (editForm.expiryDate as string)?.trim() || null,
-            batchNumber: (editForm.batchNumber as string)?.trim() || null,
-            category: (editForm.category as string)?.trim() || null,
-          }
-        : row
-    )
-    persist(next)
-    setEditingId(null)
-    setEditForm({})
+    try {
+      setBusy(true)
+      setError(null)
+      const compositeName = [String(editForm.baseName || '').trim(), String(editForm.strength || '').trim()]
+        .filter(Boolean)
+        .join(' ')
+      const res = await fetch(`/api/pharmacy/inventory/${encodeURIComponent(editingId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drugName: compositeName,
+          currentStock: editForm.currentStock ?? 0,
+          unit: editForm.unit ?? 'unit',
+          pricePerUnit: editForm.pricePerUnit ?? 0,
+          minThreshold: editForm.minThreshold ?? 10,
+          expiryDate: String(editForm.expiryDate || '').trim() || null,
+          batchNumber: String(editForm.batchNumber || '').trim() || null,
+          category: String(editForm.category || '').trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to update drug')
+      await fetchInventory()
+      setEditingId(null)
+      setEditForm({})
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to update drug')
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Remove "${name}" from the list?`)) return
-    persist(list.filter((row) => row.id !== id))
+    try {
+      setBusy(true)
+      setError(null)
+      const res = await fetch(`/api/pharmacy/inventory/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete drug')
+      await fetchInventory()
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to delete drug')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -191,15 +255,22 @@ export default function AdminPharmacyInventoryPage() {
             </Link>
           </div>
 
-          {/* Add new drug - 100% client-side, no API */}
+          {/* Add new drug */}
           <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-4">
             <h2 className="text-sm font-semibold text-slate-300 mb-3">Add new drug</h2>
             <form onSubmit={(e) => { e.preventDefault(); handleAddDrug(e); }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               <input
                 type="text"
-                placeholder="Drug name"
-                value={newDrug.drugName}
-                onChange={(e) => setNewDrug((p) => ({ ...p, drugName: e.target.value }))}
+                placeholder="Drug name (e.g. Paracetamol)"
+                value={newDrug.baseName}
+                onChange={(e) => setNewDrug((p) => ({ ...p, baseName: e.target.value }))}
+                className="px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-100 placeholder-slate-500"
+              />
+              <input
+                type="text"
+                placeholder="Strength (e.g. 500mg)"
+                value={newDrug.strength}
+                onChange={(e) => setNewDrug((p) => ({ ...p, strength: e.target.value }))}
                 className="px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700 text-slate-100 placeholder-slate-500"
               />
               <div>
@@ -265,6 +336,7 @@ export default function AdminPharmacyInventoryPage() {
               />
               <button
                 type="submit"
+                disabled={busy}
                 className="px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
@@ -272,6 +344,11 @@ export default function AdminPharmacyInventoryPage() {
               </button>
             </form>
           </div>
+          {error ? (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+              {error}
+            </div>
+          ) : null}
 
           {/* Search */}
           <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-3">
@@ -307,6 +384,7 @@ export default function AdminPharmacyInventoryPage() {
                   <thead className="bg-slate-800/50 border-b border-slate-700">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase whitespace-nowrap">Drug Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase whitespace-nowrap">Strength</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase whitespace-nowrap">Category</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase whitespace-nowrap">Batch</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase whitespace-nowrap">Expiry Date</th>
@@ -338,12 +416,24 @@ export default function AdminPharmacyInventoryPage() {
                             {isEditing ? (
                               <input
                                 type="text"
-                                value={editForm.drugName ?? ''}
-                                onChange={(e) => setEditForm((p) => ({ ...p, drugName: e.target.value }))}
+                                value={editForm.baseName ?? ''}
+                                onChange={(e) => setEditForm((p) => ({ ...p, baseName: e.target.value }))}
                                 className="w-full min-w-[120px] px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
                               />
                             ) : (
                               row.drugName
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300 whitespace-nowrap">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.strength ?? ''}
+                                onChange={(e) => setEditForm((p) => ({ ...p, strength: e.target.value }))}
+                                className="w-full min-w-[80px] px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                              />
+                            ) : (
+                              splitDrugAndStrength(row.drugName).strength || '—'
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300 whitespace-nowrap">
@@ -461,6 +551,7 @@ export default function AdminPharmacyInventoryPage() {
                                 <button
                                   type="button"
                                   onClick={handleSaveEdit}
+                                  disabled={busy}
                                   className="p-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-500"
                                   title="Save"
                                 >
@@ -487,6 +578,7 @@ export default function AdminPharmacyInventoryPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(row.id, row.drugName)}
+                                  disabled={busy}
                                   className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-red-500/20 hover:text-red-400"
                                   title="Delete"
                                 >

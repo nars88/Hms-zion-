@@ -7,7 +7,7 @@ import { useRevenue } from '@/contexts/RevenueContext'
 import { useLabResults } from '@/contexts/LabResultsContext'
 import { useCentralizedBilling } from '@/contexts/CentralizedBillingContext'
 import { useWaitingList } from '@/contexts/WaitingListContext'
-import { useLanguage } from '@/contexts/LanguageContext'
+import { formatNumber } from '@/lib/locale'
 
 interface PaymentProcessorProps {
   patient: any
@@ -35,7 +35,6 @@ export default function PaymentProcessor({ patient, onPaymentComplete }: Payment
   const { getLabResultsForPatient } = useLabResults()
   const { getInvoice, addPayment, updateInvoiceStatus } = useCentralizedBilling()
   const { updatePatientStatus } = useWaitingList()
-  const { t, formatNumber } = useLanguage()
 
   // Calculate billing breakdown when patient is selected
   useEffect(() => {
@@ -169,7 +168,7 @@ export default function PaymentProcessor({ patient, onPaymentComplete }: Payment
       <!DOCTYPE html>
       <html>
         <head>
-          <title>ZION Hospital - Invoice</title>
+          <title>NARS Hospital - Invoice</title>
           <style>
             @media print {
               @page { size: A5; margin: 10mm; }
@@ -299,7 +298,7 @@ export default function PaymentProcessor({ patient, onPaymentComplete }: Payment
 
           <div class="footer">
             <div>Payment Method: ${paymentMethod}</div>
-            <div style="margin-top: 10px;">Thank you for choosing ZION Hospital</div>
+            <div style="margin-top: 10px;">Thank you for choosing NARS Hospital</div>
             <div>This is an official invoice. Please keep it for your records.</div>
           </div>
         </body>

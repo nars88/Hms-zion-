@@ -72,7 +72,7 @@ export default function VisitQRModal({
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ZION Hospital - Patient Ticket</title>
+  <title>NARS Hospital - Patient Ticket</title>
   <style>
     @media print {
       @page {

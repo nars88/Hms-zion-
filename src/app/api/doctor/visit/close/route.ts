@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,10 @@ interface CloseVisitBody {
 
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json()) as CloseVisitBody
     const {
       visitId,

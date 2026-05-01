@@ -9,6 +9,7 @@ type PatientBadgeQRModalProps = {
   patientId: string
   patientName: string
   visitId?: string | null
+  initialPayload?: string | null
   caseType?: 'ER' | 'CLINIC'
   onClose: () => void
 }
@@ -17,6 +18,7 @@ export default function PatientBadgeQRModal({
   patientId,
   patientName,
   visitId,
+  initialPayload,
   caseType = 'CLINIC',
   onClose,
 }: PatientBadgeQRModalProps) {
@@ -90,6 +92,9 @@ export default function PatientBadgeQRModal({
   }, [patientId, liveVisitId])
 
   const payload = useMemo(() => {
+    if (caseType === 'ER' && initialPayload) {
+      return initialPayload
+    }
     return JSON.stringify({
       type: caseType === 'ER' ? 'ZION_ER_BADGE' : 'ZION_PATIENT_BADGE',
       department: caseType === 'ER' ? 'ER' : 'CLINIC',

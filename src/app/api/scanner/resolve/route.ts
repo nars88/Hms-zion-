@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server'
+import { VisitStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { verifyBadgePayload } from '@/lib/erQr'
+
+const ACTIVE_ER_VISIT_OR = [
+  { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' as const } },
+  { chiefComplaint: { contains: 'ER', mode: 'insensitive' as const } },
+  { status: VisitStatus.REGISTERED },
+  { status: VisitStatus.WITH_DOCTOR },
+  { status: VisitStatus.WAITING_FOR_DOCTOR },
+] as const
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')?.trim()
+  const visitLikeId = /^(ZION|ER)-\d{8}-\d{4}$/i.test(code || '')
 
   if (!code) {
     return NextResponse.json({ error: 'code is required' }, { status: 400 })
@@ -14,16 +25,38 @@ export async function GET(request: Request) {
   // 0. Reception badge QR (JSON payload)
   if (code.startsWith('{')) {
     try {
-      const j = JSON.parse(code) as {
+      const parsed = JSON.parse(code) as unknown
+      const badge = verifyBadgePayload(parsed)
+      if (badge) {
+        const visit = await prisma.visit.findFirst({
+          where: {
+            id: badge.visitId,
+            patientId: badge.patientId,
+            status: { not: 'Discharged' },
+          },
+          select: {
+            id: true,
+            patientId: true,
+            patient: { select: { firstName: true, lastName: true } },
+          },
+        })
+        if (visit) {
+          return NextResponse.json({
+            type: 'badge',
+            patientId: visit.patientId,
+            visitId: visit.id,
+            patientName: `${visit.patient?.firstName ?? ''} ${visit.patient?.lastName ?? ''}`.trim(),
+          })
+        }
+      }
+
+      const j = parsed as {
         type?: string
         patientId?: string
         visitId?: string
+        badgeId?: string
       }
-      if (
-        (j.type === 'ZION_ER_BADGE' || j.type === 'ZION_PATIENT_BADGE') &&
-        typeof j.patientId === 'string' &&
-        j.patientId.trim()
-      ) {
+      if (j.type === 'ZION_PATIENT_BADGE' && typeof j.patientId === 'string' && j.patientId.trim()) {
         const patient = await prisma.patient.findUnique({
           where: { id: j.patientId.trim() },
           select: {
@@ -33,10 +66,7 @@ export async function GET(request: Request) {
             visits: {
               where: {
                 status: { not: 'Discharged' },
-                OR: [
-                  { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-                  { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-                ],
+                OR: [...ACTIVE_ER_VISIT_OR],
               },
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -52,10 +82,7 @@ export async function GET(request: Request) {
                 id: j.visitId.trim(),
                 patientId: patient.id,
                 status: { not: 'Discharged' },
-                OR: [
-                  { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-                  { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-                ],
+                OR: [...ACTIVE_ER_VISIT_OR],
               },
               select: { id: true },
             })
@@ -66,6 +93,28 @@ export async function GET(request: Request) {
             patientId: patient.id,
             visitId,
             patientName: `${patient.firstName} ${patient.lastName}`.trim(),
+          })
+        }
+      }
+
+      if (typeof j.badgeId === 'string' && j.badgeId.trim()) {
+        const badgeCode = j.badgeId.trim()
+        const byBadge = await prisma.bill.findFirst({
+          where: { qrCode: badgeCode },
+          select: {
+            visitId: true,
+            patientId: true,
+            patient: { select: { firstName: true, lastName: true } },
+          },
+        })
+        if (byBadge) {
+          return NextResponse.json({
+            type: 'badge',
+            patientId: byBadge.patientId,
+            visitId: byBadge.visitId,
+            patientName: byBadge.patient
+              ? `${byBadge.patient.firstName} ${byBadge.patient.lastName}`.trim()
+              : 'Patient',
           })
         }
       }
@@ -124,6 +173,37 @@ export async function GET(request: Request) {
         ? `${byVisitId.patient.firstName} ${byVisitId.patient.lastName}`.trim()
         : 'Patient',
     })
+  }
+
+  // 2.b Try public/printed visitId formats (e.g. ZION-YYYYMMDD-0001) stored in notes/badge metadata.
+  if (visitLikeId) {
+    const byVisitPublicId = await prisma.visit
+      .findFirst({
+        where: {
+          status: { not: 'Discharged' },
+          OR: [{ notes: { contains: code! } }],
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          patientId: true,
+          patient: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      })
+      .catch(() => null)
+
+    if (byVisitPublicId) {
+      return NextResponse.json({
+        type: 'visit',
+        patientId: byVisitPublicId.patientId,
+        visitId: byVisitPublicId.id,
+        patientName: byVisitPublicId.patient
+          ? `${byVisitPublicId.patient.firstName} ${byVisitPublicId.patient.lastName}`.trim()
+          : 'Patient',
+      })
+    }
   }
 
   // 3. Try as bill QR code

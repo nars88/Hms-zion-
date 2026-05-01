@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { EmergencyTaskStatus, VisitStatus } from '@prisma/client'
 import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 export interface ERTask {
+  taskId?: string
   visitId: string
   patientName: string
   bedNumber: number | null
@@ -17,7 +18,7 @@ export interface ERTask {
   priority?: 'CRITICAL' | 'NORMAL'
 }
 
-// GET /api/emergency/tasks — pending NURSE_TASK for logged-in ER nurse (POOL or self)
+// GET /api/emergency/tasks — pending NURSE_TASK from normalized EmergencyTask table.
 export async function GET(request: Request) {
   try {
     const user = await getRequestUser(request)
@@ -36,6 +37,18 @@ export async function GET(request: Request) {
         id: true,
         notes: true,
         bedNumber: true,
+        emergencyTasks: {
+          where: {
+            type: 'NURSE_TASK',
+            status: { in: [EmergencyTaskStatus.PENDING, EmergencyTaskStatus.CREATED] },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+          },
+        },
         patient: {
           select: {
             firstName: true,
@@ -50,36 +63,19 @@ export async function GET(request: Request) {
       const bedNumber = v.bedNumber ?? null
       const patientName = `${v.patient?.firstName ?? ''} ${v.patient?.lastName ?? ''}`.trim()
       try {
-        if (!v.notes) continue
-        const parsed = JSON.parse(v.notes) as {
-          erCriticalAlert?: boolean
-          erOrders?: Array<{
-            type: string
-            content?: string
-            at: string
-            status?: string
-            assigneeUserId?: string
-          }>
-        }
+        const parsed = v.notes ? (JSON.parse(v.notes) as { erCriticalAlert?: boolean }) : {}
         const priority: 'CRITICAL' | 'NORMAL' = parsed.erCriticalAlert ? 'CRITICAL' : 'NORMAL'
-        const erOrders = parsed.erOrders || []
-        for (const order of erOrders) {
-          if (order.type !== 'NURSE_TASK') continue
-          const st = order.status || 'TASK_PENDING'
-          if (st !== 'TASK_PENDING' && st !== 'PENDING') continue
-          const assignee = order.assigneeUserId || 'POOL'
-          if (user.role === 'ER_NURSE') {
-            if (assignee !== 'POOL' && assignee !== user.id) continue
-          }
+        for (const task of v.emergencyTasks) {
           tasks.push({
+            taskId: task.id,
             visitId: v.id,
             patientName,
             bedNumber,
-            type: order.type,
-            content: order.content,
-            at: order.at,
-            status: order.status,
-            assigneeUserId: assignee,
+            type: 'NURSE_TASK',
+            content: task.title,
+            at: task.createdAt.toISOString(),
+            status: 'PENDING',
+            assigneeUserId: 'POOL',
             priority,
           })
         }

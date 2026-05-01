@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // PATCH /api/pharmacy/inventory/[id]/restock – add quantity to existing drug
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { id } = await params
     const body = await request.json()
     const add = Number(body.quantityToAdd ?? body.quantity ?? 0)
     if (!id || add <= 0) {

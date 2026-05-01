@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { syncUserDepartmentLink, verifyDepartmentExists } from '@/lib/departmentEmployeeSync'
 import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
+import { writeAuditLog } from '@/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,9 +33,10 @@ async function readDepartmentIdFromDb(userId: string): Promise<string | null> {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
     if (user.role !== 'ADMIN') return forbidden()
@@ -58,9 +60,9 @@ export async function PATCH(
         if (!ok) {
           return NextResponse.json({ error: 'Invalid department' }, { status: 400 })
         }
-        await syncUserDepartmentLink(params.id, raw)
+        await syncUserDepartmentLink(id, raw)
       } else {
-        await syncUserDepartmentLink(params.id, null)
+        await syncUserDepartmentLink(id, null)
       }
       departmentChanged = true
     }
@@ -88,7 +90,7 @@ export async function PATCH(
 
     if (email?.trim()) {
       const existing = await prisma.user.findFirst({
-        where: { email: email.toLowerCase().trim(), NOT: { id: params.id } },
+        where: { email: email.toLowerCase().trim(), NOT: { id } },
       })
       if (existing) {
         return NextResponse.json({ error: 'Email already in use' }, { status: 400 })
@@ -113,13 +115,13 @@ export async function PATCH(
       | null
     if (Object.keys(updateData).length > 0) {
       updated = await prisma.user.update({
-        where: { id: params.id },
+        where: { id },
         data: updateData,
         select: userPublicSelect,
       })
     } else if (departmentChanged) {
       updated = await prisma.user.findUnique({
-        where: { id: params.id },
+        where: { id },
         select: userPublicSelect,
       })
       if (!updated) {
@@ -129,7 +131,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
 
-    const departmentIdOut = await readDepartmentIdFromDb(params.id)
+    const departmentIdOut = await readDepartmentIdFromDb(id)
+
+    await writeAuditLog(prisma, {
+      actor: user,
+      request,
+      action: `Updated employee: ${updated?.email ?? id}`,
+      metadata: {
+        employeeId: id,
+        fields: {
+          name: updateData.name,
+          role: updateData.role,
+          email: updateData.email,
+          passwordRotated: Boolean(updateData.password),
+          departmentChanged,
+        },
+      },
+    })
 
     return NextResponse.json({
       success: true,
@@ -142,15 +160,33 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getRequestUser(request)
-    if (!user) return unauthorized()
-    if (user.role !== 'ADMIN') return forbidden()
+    const { id } = await params
+    const requester = await getRequestUser(request)
+    if (!requester) return unauthorized()
+    if (requester.role !== 'ADMIN') return forbidden()
 
-    await syncUserDepartmentLink(params.id, null)
-    await prisma.user.delete({ where: { id: params.id } })
+    const target = await prisma.user.findUnique({
+      where: { id },
+      select: { name: true, email: true, role: true },
+    })
+
+    await syncUserDepartmentLink(id, null)
+    await prisma.user.delete({ where: { id } })
+
+    await writeAuditLog(prisma, {
+      actor: requester,
+      request,
+      action: target
+        ? `Deleted employee: ${target.name} (${target.email})`
+        : `Deleted employee id: ${id}`,
+      metadata: target
+        ? { employeeId: id, email: target.email, role: target.role, name: target.name }
+        : { employeeId: id },
+    })
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to delete' }, { status: 500 })

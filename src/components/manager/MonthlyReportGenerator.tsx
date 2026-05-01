@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { FileText, Download, Loader2 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
 import { useCentralizedBilling } from '@/contexts/CentralizedBillingContext'
 import { useVisitData } from '@/contexts/VisitDataContext'
 import { useWaitingList } from '@/contexts/WaitingListContext'
@@ -40,12 +39,40 @@ const safeDate = (value: unknown) => {
   return date.toLocaleDateString('en-US')
 }
 
-const getReportFileName = (extension: 'pdf' | 'xlsx') => {
+const getReportFileName = (extension: 'pdf' | 'csv') => {
   const now = new Date()
   const day = String(now.getDate()).padStart(2, '0')
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const year = now.getFullYear()
   return `zion_monthly_report_${day}-${month}-${year}.${extension}`
+}
+
+const escapeCsv = (value: unknown): string => {
+  const str = String(value ?? '')
+  const escaped = str.replace(/"/g, '""')
+  return `"${escaped}"`
+}
+
+const toCsv = (rows: Array<Record<string, unknown>>): string => {
+  if (rows.length === 0) return ''
+  const headers = Object.keys(rows[0])
+  const headerLine = headers.map((h) => escapeCsv(h)).join(',')
+  const body = rows
+    .map((row) => headers.map((h) => escapeCsv(row[h])).join(','))
+    .join('\n')
+  return `${headerLine}\n${body}`
+}
+
+const downloadTextFile = (content: string, fileName: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 /**
@@ -198,7 +225,7 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
 
     const parsed = JSON.parse(reportData) as ReportData
 
-    const metricsSheet = XLSX.utils.json_to_sheet([
+    const metricsRows = [
       { Metric: 'Month', Value: parsed.month },
       { Metric: 'Generated At', Value: new Date(parsed.generatedAt).toLocaleString('en-US') },
       { Metric: 'Total Revenue', Value: parsed.metrics.totalRevenue },
@@ -208,10 +235,9 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
       { Metric: 'Paid Invoices', Value: parsed.metrics.paidInvoices },
       { Metric: 'Partial Invoices', Value: parsed.metrics.partialInvoices },
       { Metric: 'Pending Invoices', Value: parsed.metrics.pendingInvoices },
-    ])
+    ]
 
-    const invoicesSheet = XLSX.utils.json_to_sheet(
-      parsed.invoices.map((invoice) => ({
+    const invoicesRows = parsed.invoices.map((invoice) => ({
         InvoiceID: String(invoice.id ?? invoice.invoiceNumber ?? '-'),
         Patient: String(invoice.patientName ?? invoice.patientId ?? '-'),
         Status: String(invoice.status ?? '-'),
@@ -219,22 +245,26 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
         RemainingAmount: Number(invoice.remainingAmount ?? 0),
         CreatedAt: safeDate(invoice.createdAt),
       }))
-    )
 
-    const visitsSheet = XLSX.utils.json_to_sheet(
-      parsed.visits.map((visit) => ({
+    const visitsRows = parsed.visits.map((visit) => ({
         VisitID: String(visit.id ?? '-'),
         PatientID: String(visit.patientId ?? '-'),
         CompletedAt: safeDate(visit.completedAt),
         Status: String(visit.status ?? '-'),
       }))
-    )
 
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, metricsSheet, 'Summary')
-    XLSX.utils.book_append_sheet(wb, invoicesSheet, 'Invoices')
-    XLSX.utils.book_append_sheet(wb, visitsSheet, 'Visits')
-    XLSX.writeFile(wb, getReportFileName('xlsx'))
+    const content = [
+      'Summary',
+      toCsv(metricsRows),
+      '',
+      'Invoices',
+      toCsv(invoicesRows),
+      '',
+      'Visits',
+      toCsv(visitsRows),
+    ].join('\n')
+
+    downloadTextFile(content, getReportFileName('csv'), 'text/csv;charset=utf-8;')
   }
 
   return (
@@ -280,7 +310,7 @@ export default function MonthlyReportGenerator({ onReportGenerated }: MonthlyRep
               className="px-4 py-2 bg-slate-800/50 text-secondary border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-all text-sm font-medium flex items-center gap-2"
             >
               <Download size={16} />
-              <span>Excel</span>
+              <span>CSV</span>
             </button>
           </div>
         </div>

@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic'
 // Returns patient allergies for a specific visit (for safety check)
 export async function GET(
   request: Request,
-  { params }: { params: { visitId: string } }
+  { params }: { params: Promise<{ visitId: string }> }
 ) {
   try {
-    const { visitId } = params
+    const { visitId } = await params
 
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },

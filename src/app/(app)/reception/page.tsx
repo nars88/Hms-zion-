@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { QrCode } from 'lucide-react'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import SmartSidebar from '@/components/shared/SmartSidebar'
@@ -8,48 +9,17 @@ import StatsCards from '@/components/reception/StatsCards'
 import QuickActions from '@/components/reception/QuickActions'
 import PatientSearch from '@/components/reception/PatientSearch'
 import PatientRegistrationModal from '@/components/reception/PatientRegistrationModal'
-import ERRegistrationModal from '@/components/reception/ERRegistrationModal'
 import PatientQueue from '@/components/reception/PatientQueue'
 import BackButton from '@/components/BackButton'
 
-import AppointmentNotifications from '@/components/reception/AppointmentNotifications'
 import PatientBadgeQRModal from '@/components/reception/PatientBadgeQRModal'
-import AppointmentBookingModal from '@/components/reception/AppointmentBookingModal'
-import VisitQRModal from '@/components/reception/VisitQRModal'
-import { generateVisitId } from '@/lib/visitIdGenerator'
 
 export default function ReceptionDashboard() {
+  const router = useRouter()
   const [showRegistrationModal, setShowRegistrationModal] = useState(false)
-  const [showERRegistrationModal, setShowERRegistrationModal] = useState(false)
   const [showWaitingListModal, setShowWaitingListModal] = useState(false)
   const [showBadgeModal, setShowBadgeModal] = useState(false)
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false)
-  const [showVisitQRModal, setShowVisitQRModal] = useState(false)
-  const [workflowMessage, setWorkflowMessage] = useState<string | null>(null)
-  const [workflowPatient, setWorkflowPatient] = useState<{ patientId: string; patientName: string } | null>(null)
-  const [visitQrData, setVisitQrData] = useState<{
-    visitId: string
-    patientId: string
-    patientName: string
-    doctorName: string
-    department: string
-    appointmentDate: string
-    appointmentTime: string
-    queueNumber: number
-  } | null>(null)
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
-  // CORE WORKFLOW: REGISTER -> ASSIGN -> QR
-  // Handle successful registration - redirect to appointment booking
-  const handleRegistrationSuccess = (patientId: string, patientName: string) => {
-    // Step 1: close registration + open doctor selection automatically
-    setShowRegistrationModal(false)
-    setWorkflowPatient({ patientId, patientName })
-    setWorkflowMessage('Success! Redirecting to Doctor Selection...')
-    window.setTimeout(() => {
-      setWorkflowMessage(null)
-      setShowAppointmentModal(true)
-    }, 500)
-  }
 
   const badgeMeta = useMemo(() => {
     if (!selectedPatient) return null
@@ -99,9 +69,9 @@ export default function ReceptionDashboard() {
 
             {/* Quick Actions Bar */}
             <div className="flex-shrink-0">
-              <QuickActions 
+              <QuickActions
                 onNewPatient={() => setShowRegistrationModal(true)}
-                onERRegistration={() => setShowERRegistrationModal(true)}
+                onERQuick={() => router.push('/reception/er-quick')}
               />
             </div>
 
@@ -117,85 +87,6 @@ export default function ReceptionDashboard() {
       {showRegistrationModal && (
         <PatientRegistrationModal 
           onClose={() => setShowRegistrationModal(false)} 
-          onRegistrationSuccess={handleRegistrationSuccess}
-        />
-      )}
-      {/* CORE WORKFLOW: REGISTER -> ASSIGN -> QR */}
-      {showAppointmentModal && workflowPatient ? (
-        <AppointmentBookingModal
-          onClose={() => {
-            setShowAppointmentModal(false)
-            setWorkflowPatient(null)
-          }}
-          patientId={workflowPatient.patientId}
-          patientName={workflowPatient.patientName}
-          onBookingSuccess={(data) => {
-            // CORE WORKFLOW: REGISTER -> ASSIGN -> QR
-            // Step 2: immediately open QR generation after doctor assignment
-            setShowAppointmentModal(false)
-            setVisitQrData(data)
-            setShowVisitQRModal(true)
-          }}
-        />
-      ) : null}
-      {showVisitQRModal && visitQrData ? (
-        <VisitQRModal
-          visitId={visitQrData.visitId}
-          patientName={visitQrData.patientName}
-          patientId={visitQrData.patientId}
-          doctorName={visitQrData.doctorName}
-          department={visitQrData.department}
-          appointmentDate={visitQrData.appointmentDate}
-          appointmentTime={visitQrData.appointmentTime}
-          queueNumber={visitQrData.queueNumber}
-          onClose={() => setShowVisitQRModal(false)}
-          onDone={() => {
-            setShowVisitQRModal(false)
-            setVisitQrData(null)
-            setWorkflowPatient(null)
-          }}
-        />
-      ) : null}
-      {showERRegistrationModal && (
-        <ERRegistrationModal
-          onClose={() => setShowERRegistrationModal(false)}
-          onRegister={({ fullName, age, phone }) => {
-            const tmpVisitId = generateVisitId()
-            const tmpPatientId = `ER-PENDING-${Date.now().toString(36).toUpperCase()}`
-
-            // Bullet flow: close ER modal + open QR immediately (no spinner)
-            setShowERRegistrationModal(false)
-            setSelectedPatient({ id: tmpPatientId, name: fullName, visitId: tmpVisitId, caseType: 'ER' })
-            setShowBadgeModal(true)
-
-            // Backend work runs in the background and upgrades the QR to real ids
-            fetch('/api/reception/er-registration', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fullName, age, phone }),
-            })
-              .then(async (res) => {
-                const data = await res.json().catch(() => ({}))
-                if (!res.ok) throw new Error(data?.error || 'ER registration failed')
-                return data as { patient: { id: string; name?: string }; visit: { id: string } }
-              })
-              .then(({ patient, visit }) => {
-                const patientId = patient.id
-                const visitId = visit.id
-                const patientName = patient.name || fullName
-                setSelectedPatient({ id: patientId, name: patientName, visitId, caseType: 'ER' })
-
-                // Keep non-blocking, never freezes UI
-                fetch('/api/er/create-case', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ visitId, patientId, patientName }),
-                }).catch(() => null)
-              })
-              .catch((err) => {
-                console.error('ER registration background error:', err)
-              })
-          }}
         />
       )}
       {showWaitingListModal && (
@@ -224,19 +115,10 @@ export default function ReceptionDashboard() {
           patientId={badgeMeta.patientId}
           patientName={badgeMeta.patientName}
           visitId={badgeMeta.visitId}
+          initialPayload={selectedPatient?.qrPayload ?? null}
           caseType={selectedPatient?.caseType === 'ER' ? 'ER' : 'CLINIC'}
           onClose={() => setShowBadgeModal(false)}
         />
-      ) : null}
-      {workflowMessage ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
-          <div className="rounded-xl border border-emerald-500/30 bg-slate-900/90 px-5 py-3 text-sm text-emerald-300 shadow-xl">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-              {workflowMessage}
-            </span>
-          </div>
-        </div>
       ) : null}
       </div>
       <BackButton />

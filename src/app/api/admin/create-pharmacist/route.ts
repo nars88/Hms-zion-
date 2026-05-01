@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,15 @@ export const dynamic = 'force-dynamic'
 // Creates the pharmacy user account
 export async function POST(request: Request) {
   try {
+    const requester = await getRequestUser(request)
+    if (!requester) return unauthorized()
+    if (requester.role !== 'ADMIN') return forbidden()
+
+    const defaultPassword = process.env.DEFAULT_PHARMACIST_PASSWORD?.trim()
+    if (!defaultPassword) {
+      return NextResponse.json({ error: 'DEFAULT_PHARMACIST_PASSWORD is not configured' }, { status: 500 })
+    }
+
     // Check if user already exists
     const existing = await prisma.user.findUnique({
       where: { email: 'pharmacy@zion.com' },
@@ -18,7 +28,7 @@ export async function POST(request: Request) {
       const updated = await prisma.user.update({
         where: { email: 'pharmacy@zion.com' },
         data: {
-          password: 'zion123', // Plain text for now (matching login API)
+          password: defaultPassword,
           name: 'Senior Pharmacist',
           role: UserRole.PHARMACIST,
           phone: '+964 750 000 0005',
@@ -41,7 +51,7 @@ export async function POST(request: Request) {
     const user = await prisma.user.create({
       data: {
         email: 'pharmacy@zion.com',
-        password: 'zion123', // Plain text for now (matching login API)
+        password: defaultPassword,
         name: 'Senior Pharmacist',
         role: UserRole.PHARMACIST,
         phone: '+964 750 000 0005',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { VisitStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,10 +18,15 @@ export async function GET(request: Request) {
       })
     }
 
-    // Search by name or phone
+    // Search by name, phone, or direct patient ID; include latest active visit for ER fallback.
     const patients = await prisma.patient.findMany({
       where: {
         OR: [
+          {
+            id: {
+              contains: query,
+            },
+          },
           {
             firstName: {
               contains: query,
@@ -44,6 +50,18 @@ export async function GET(request: Request) {
       orderBy: {
         createdAt: 'desc',
       },
+      include: {
+        visits: {
+          where: {
+            status: {
+              notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true },
+        },
+      },
     })
 
     return NextResponse.json({
@@ -55,6 +73,7 @@ export async function GET(request: Request) {
         phone: p.phone,
         dateOfBirth: p.dateOfBirth,
         gender: p.gender,
+        latestVisitId: p.visits[0]?.id ?? null,
       })),
     })
   } catch (error: any) {

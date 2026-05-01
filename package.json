@@ -1,7 +1,7 @@
 {
   "name": "zion-med",
   "version": "1.0.0",
-  "description": "Zion Med - Premium Hospital Management System",
+  "description": "NARS Hospital - Hospital Management System (HMS)",
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
@@ -13,9 +13,12 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:push:direct": "node scripts/db-push-direct.mjs",
+    "db:sync:admin-tables": "node scripts/db-execute-push-url.mjs scripts/sql/sync-system-settings-audit-log.sql",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
+    "db:seed:service-catalog": "node scripts/seed-service-catalog.mjs",
     "db:indexes": "node scripts/add-indexes.mjs",
     "db:departments": "prisma db execute --file prisma/migrations/manual_departments.sql --schema prisma/schema.prisma",
     "create:pharmacist": "node scripts/create-pharmacist.js",
@@ -28,19 +31,18 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.562.0",
-    "next": "^14.0.4",
+    "next": "^16.2.4",
     "qrcode.react": "^4.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-icons": "^5.6.0",
-    "recharts": "^3.8.0",
-    "xlsx": "^0.18.5"
+    "recharts": "^3.8.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -49,10 +51,10 @@
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.16",
-    "eslint": "^8.56.0",
-    "eslint-config-next": "^14.0.4",
+    "eslint": "9.39.1",
+    "eslint-config-next": "^16.2.4",
     "postcss": "^8.4.32",
-    "prisma": "^5.7.1",
+    "prisma": "6.19.3",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.3"
   }

@@ -16,7 +16,7 @@ export default function BillingPage() {
 
   return (
     <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.RECEPTIONIST]}>
-      <div className="flex h-screen bg-[#0B1120] overflow-hidden">
+      <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SmartSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Main Content - Split Screen */}

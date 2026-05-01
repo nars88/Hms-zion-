@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +8,10 @@ export const dynamic = 'force-dynamic'
 // Adds an item to a patient's invoice
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'PHARMACIST', 'LAB_TECH', 'RADIOLOGY_TECH', 'ACCOUNTANT', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, patientId, department, description, quantity, unitPrice, total, addedBy } = body
 

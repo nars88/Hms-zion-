@@ -11,14 +11,10 @@ import { CentralizedBillingProvider } from '@/contexts/CentralizedBillingContext
 import { AppointmentsProvider } from '@/contexts/AppointmentsContext'
 import { PharmacyProvider } from '@/contexts/PharmacyContext'
 import { InventoryProvider } from '@/contexts/InventoryContext'
-import { LanguageProvider } from '@/contexts/LanguageContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
 import { StatsProvider } from '@/contexts/StatsContext'
 import { QRScannerProvider } from '@/contexts/QRScannerContext'
 
 const providers = [
-  ThemeProvider,
-  LanguageProvider,
   AuthProvider,
   RevenueProvider,
   PatientRegistryProvider,

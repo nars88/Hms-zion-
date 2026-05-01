@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { VisitStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,21 +9,16 @@ export const dynamic = 'force-dynamic'
 // Marks invoice as paid and automatically updates QR status to CLEARED
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ACCOUNTANT', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { id } = await params
     const body = await request.json()
     const { paymentMethod } = body
-
-    // Get current user (accountant)
-    const userIdCookie = request.cookies.get('zionmed_auth_token')
-    if (!userIdCookie?.value) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     // Find bill
     const bill = await prisma.bill.findUnique({
@@ -49,6 +46,32 @@ export async function POST(
         updatedAt: new Date(),
       },
     })
+
+    const visitId = bill.visit?.id
+    if (visitId) {
+      let parsedNotes: Record<string, unknown> = {}
+      try {
+        if (bill.visit.notes) parsedNotes = JSON.parse(bill.visit.notes) as Record<string, unknown>
+      } catch {
+        parsedNotes = {}
+      }
+      const isER =
+        bill.visit.chiefComplaint?.toLowerCase().includes('emergency') ||
+        bill.visit.chiefComplaint?.toLowerCase().includes('er')
+      await prisma.visit.update({
+        where: { id: visitId },
+        data: {
+          status: isER ? VisitStatus.Discharged : VisitStatus.COMPLETED,
+          bedNumber: null,
+          notes: JSON.stringify({
+            ...parsedNotes,
+            bedExitState: 'AVAILABLE',
+            bedReleasedAt: new Date().toISOString(),
+          }),
+          updatedAt: new Date(),
+        },
+      })
+    }
 
     return NextResponse.json({
       success: true,

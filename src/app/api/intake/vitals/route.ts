@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   try {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
-    if (!['INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+    if (!['INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
 
     const body = (await request.json()) as VitalsBody
     const {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AreaChart,
   Area,
@@ -12,20 +12,27 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { DollarSign, Users, CalendarCheck, TrendingUp } from 'lucide-react'
-import { useCentralizedBilling } from '@/contexts/CentralizedBillingContext'
-import { useVisitData } from '@/contexts/VisitDataContext'
-import { useAppointments } from '@/contexts/AppointmentsContext'
+import { DollarSign, Users, CalendarCheck, TrendingUp, Download } from 'lucide-react'
 
-/** Mock data: last 6 months — realistic revenue (IQD) and patient visits */
-const MOCK_MONTHLY_REVENUE_AND_VISITS = [
-  { month: 'Oct', revenue: 12450000, visits: 342 },
-  { month: 'Nov', revenue: 15820000, visits: 418 },
-  { month: 'Dec', revenue: 14280000, visits: 391 },
-  { month: 'Jan', revenue: 18940000, visits: 467 },
-  { month: 'Feb', revenue: 16570000, visits: 429 },
-  { month: 'Mar', revenue: 21230000, visits: 518 },
-]
+type DashboardMonthPoint = {
+  month: string
+  year: number
+  monthIndex: number
+  revenue: number
+  visits: number
+}
+
+type DashboardPayload = {
+  success?: boolean
+  error?: string
+  summary?: {
+    monthRevenueIqd: number
+    monthVisitCount: number
+    monthBillCount: number
+    todayVisitCount: number
+  }
+  monthlySeries?: DashboardMonthPoint[]
+}
 
 type ChartTooltipProps = {
   active?: boolean
@@ -34,7 +41,6 @@ type ChartTooltipProps = {
   valueFormatter?: (v: number) => string
 }
 
-/** Dark, elegant custom tooltip — exact values, ZION palette */
 function ChartTooltip({ active, payload, label, valueFormatter }: ChartTooltipProps) {
   if (!active || !payload?.length) return null
   const formatter = valueFormatter ?? ((v: number) => String(v))
@@ -48,41 +54,81 @@ function ChartTooltip({ active, payload, label, valueFormatter }: ChartTooltipPr
 }
 
 export default function AdminDashboardPage() {
-  const { invoices } = useCentralizedBilling()
-  const { visitData } = useVisitData()
-  const { getAppointmentsByDate } = useAppointments()
+  const [data, setData] = useState<DashboardPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
-  const today = new Date().toISOString().slice(0, 10)
-  const todayAppointments = getAppointmentsByDate(today).filter(
-    (a) => a.status !== 'Cancelled' && a.status !== 'No_Show'
-  )
-
-  const monthlyData = useMemo(() => {
-    const now = new Date()
-    const currentMonth = now.getMonth()
-    const currentYear = now.getFullYear()
-    const monthlyInvoices = Object.values(invoices).filter((inv) => {
-      const d = new Date(inv.createdAt)
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear
-    })
-    const monthlyVisits = Object.values(visitData).filter((v) => {
-      const d = new Date(v.completedAt)
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear
-    })
-    const totalRevenue = monthlyInvoices
-      .filter((i) => i.status === 'Paid' || i.status === 'Partial')
-      .reduce((s, i) => s + i.paidAmount, 0)
-    return {
-      totalRevenue,
-      patientCount: monthlyVisits.length,
-      invoiceCount: monthlyInvoices.length,
+  const loadDashboard = useCallback(async () => {
+    try {
+      setFetchError(null)
+      setLoading(true)
+      const res = await fetch('/api/admin/dashboard', { credentials: 'include', cache: 'no-store' })
+      const json = (await res.json().catch(() => ({}))) as DashboardPayload
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      setData(json)
+    } catch (e: unknown) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to load dashboard')
+      setData(null)
+    } finally {
+      setLoading(false)
     }
-  }, [invoices, visitData])
+  }, [])
+
+  useEffect(() => {
+    void loadDashboard()
+  }, [loadDashboard])
+
+  const chartRows = useMemo(() => {
+    const series = data?.monthlySeries ?? []
+    return series.map((p) => ({
+      month: p.month,
+      revenue: p.revenue,
+      visits: p.visits,
+      key: `${p.year}-${p.monthIndex}`,
+    }))
+  }, [data?.monthlySeries])
+
+  const summary = data?.summary
+
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupError, setBackupError] = useState<string | null>(null)
+
+  const handleExportBackup = useCallback(async () => {
+    if (backupLoading) return
+    try {
+      setBackupLoading(true)
+      setBackupError(null)
+      const res = await fetch('/api/admin/backup', { cache: 'no-store' })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(payload?.error || `Backup failed (HTTP ${res.status})`)
+      }
+      const payload = await res.json()
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const now = new Date()
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const yyyy = now.getFullYear()
+      const filename = `zion_backup_${dd}-${mm}-${yyyy}.json`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      setBackupError(e instanceof Error ? e.message : 'Failed to export backup')
+    } finally {
+      setBackupLoading(false)
+    }
+  }, [backupLoading])
 
   const stats = [
     {
       label: 'Total Revenue (Month)',
-      value: `${monthlyData.totalRevenue.toLocaleString('en-US')} IQD`,
+      value: `${(summary?.monthRevenueIqd ?? 0).toLocaleString('en-US')} IQD`,
       icon: DollarSign,
       color: 'emerald',
       bg: 'bg-emerald-500/10',
@@ -90,8 +136,8 @@ export default function AdminDashboardPage() {
       iconCl: 'text-emerald-400',
     },
     {
-      label: 'Patient Visits (Month)',
-      value: monthlyData.patientCount,
+      label: 'Patient visits (Month)',
+      value: loading ? '…' : (summary?.monthVisitCount ?? 0),
       icon: Users,
       color: 'cyan',
       bg: 'bg-cyan-500/10',
@@ -99,8 +145,8 @@ export default function AdminDashboardPage() {
       iconCl: 'text-cyan-400',
     },
     {
-      label: "Today's Appointments",
-      value: todayAppointments.length,
+      label: "Today's visits (UTC day)",
+      value: loading ? '…' : (summary?.todayVisitCount ?? 0),
       icon: CalendarCheck,
       color: 'amber',
       bg: 'bg-amber-500/10',
@@ -108,8 +154,8 @@ export default function AdminDashboardPage() {
       iconCl: 'text-amber-400',
     },
     {
-      label: 'Invoices (Month)',
-      value: monthlyData.invoiceCount,
+      label: 'Bills created (Month)',
+      value: loading ? '…' : (summary?.monthBillCount ?? 0),
       icon: TrendingUp,
       color: 'violet',
       bg: 'bg-violet-500/10',
@@ -122,6 +168,49 @@ export default function AdminDashboardPage() {
     <div className="min-h-full bg-slate-950 w-full">
       <div className="max-w-7xl mx-auto px-6 py-6 md:px-8 md:py-7 w-full">
         <div className="space-y-8">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              disabled={loading}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+            >
+              {loading ? 'Refreshing…' : 'Refresh stats'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportBackup}
+              disabled={backupLoading}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-gradient-to-r from-cyan-600 to-sky-600 px-5 text-sm font-semibold text-white shadow-lg shadow-cyan-900/30 transition hover:from-cyan-500 hover:to-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {backupLoading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  Preparing backup...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Export System Backup
+                </>
+              )}
+            </button>
+          </div>
+          {fetchError ? (
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
+              {fetchError}
+            </div>
+          ) : null}
+          {backupError ? (
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
+              {backupError}
+            </div>
+          ) : null}
+          <p className="text-xs text-slate-500">
+            Stats and charts use live <span className="text-slate-400">visits</span> and <span className="text-slate-400">bills</span> from PostgreSQL (month boundaries UTC).
+            Revenue counts bills with status Paid/COMPLETED in the month (by <code className="text-slate-600">paidAt</code>, or{' '}
+            <code className="text-slate-600">updatedAt</code> if <code className="text-slate-600">paidAt</code> is null).
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {stats.map((s) => {
               const Icon = s.icon
@@ -146,54 +235,79 @@ export default function AdminDashboardPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 min-h-0">
-              <h2 className="text-lg font-semibold text-white mb-4">Monthly Revenue</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">Monthly revenue (paid bills)</h2>
               <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={MOCK_MONTHLY_REVENUE_AND_VISITS} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#0d9488" stopOpacity={0.08} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={{ stroke: '#334155' }} />
-                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`} />
-                    <Tooltip
-                      content={(p: unknown) => <ChartTooltip {...(p as ChartTooltipProps)} valueFormatter={(v) => `${Number(v).toLocaleString('en-US')} IQD`} />}
-                      cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#06b6d4"
-                      strokeWidth={2}
-                      fill="url(#revenueGradient)"
-                      activeDot={{ r: 8, stroke: '#06b6d4', strokeWidth: 2, fill: '#0f172a' }}
-                      dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }}
-                      isAnimationActive
-                      animationDuration={1500}
-                      animationEasing="ease-out"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {chartRows.length === 0 && !loading ? (
+                  <p className="text-sm text-slate-500 py-12 text-center">No data for the last six months.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#0d9488" stopOpacity={0.08} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={{ stroke: '#334155' }} />
+                      <YAxis
+                        stroke="#64748b"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`}
+                      />
+                      <Tooltip
+                        content={(p: unknown) => (
+                          <ChartTooltip {...(p as ChartTooltipProps)} valueFormatter={(v) => `${Number(v).toLocaleString('en-US')} IQD`} />
+                        )}
+                        cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#06b6d4"
+                        strokeWidth={2}
+                        fill="url(#revenueGradient)"
+                        activeDot={{ r: 8, stroke: '#06b6d4', strokeWidth: 2, fill: '#0f172a' }}
+                        dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }}
+                        isAnimationActive
+                        animationDuration={1500}
+                        animationEasing="ease-out"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
             <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 min-h-0">
-              <h2 className="text-lg font-semibold text-white mb-4">Patient Visits</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">Patient visits by month</h2>
               <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={MOCK_MONTHLY_REVENUE_AND_VISITS} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={{ stroke: '#334155' }} />
-                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      content={(p: unknown) => <ChartTooltip {...(p as ChartTooltipProps)} />}
-                      cursor={{ fill: '#1e293b', fillOpacity: 0.3, stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
-                    <Bar dataKey="visits" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={48} activeBar={{ fill: '#34d399', stroke: '#10b981', strokeWidth: 1 }} isAnimationActive animationDuration={1500} animationEasing="ease-out" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartRows.length === 0 && !loading ? (
+                  <p className="text-sm text-slate-500 py-12 text-center">No visit data for the last six months.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={{ stroke: '#334155' }} />
+                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip
+                        content={(p: unknown) => <ChartTooltip {...(p as ChartTooltipProps)} />}
+                        cursor={{ fill: '#1e293b', fillOpacity: 0.3, stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
+                      />
+                      <Bar
+                        dataKey="visits"
+                        fill="#10b981"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={48}
+                        activeBar={{ fill: '#34d399', stroke: '#10b981', strokeWidth: 1 }}
+                        isAnimationActive
+                        animationDuration={1500}
+                        animationEasing="ease-out"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
           </div>

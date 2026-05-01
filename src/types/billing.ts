@@ -27,5 +27,7 @@ export interface Invoice {
   paidAt: string | null
   createdAt: string
   updatedAt: string
+  hasUndispensedMedications?: boolean
+  undispensedMedicationStatus?: string | null
 }
 

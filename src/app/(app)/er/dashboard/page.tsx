@@ -27,12 +27,24 @@ export default function ERDashboardPage() {
 
   useEffect(() => {
     void load()
-    const id = window.setInterval(() => void load(), 15000)
-    return () => window.clearInterval(id)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void load()
+    }, 20000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [load])
 
   const beds = patients.filter((p) => p.bedNumber != null).length
-  const waiting = patients.filter((p) => p.status === 'WAITING_FOR_DOCTOR').length
+  const waiting = patients.filter(
+    (p) => p.status === 'WITH_DOCTOR' || p.status === 'WAITING_FOR_DOCTOR'
+  ).length
   const tasksPending = patients.filter((p) => p.nurseTasksPending).length
 
   return (

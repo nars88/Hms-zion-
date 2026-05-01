@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getRequestUser } from '@/lib/apiAuth'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 import { logEmergencyActivity } from '@/lib/emergencyActivity'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic'
 // POST /api/emergency/doctor/append-task — append erOrders row (PHARMACY audit, NURSE_TASK, etc.)
 export async function POST(request: Request) {
   try {
-    const user = await getRequestUser(request).catch(() => null)
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
     const body = (await request.json()) as {
       visitId?: string
       type?: string

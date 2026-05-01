@@ -122,10 +122,10 @@ export default function PatientSearch({ onPatientSelected, onPatientCleared }: P
     const count = seedTestData()
     if (count > 0) {
       setSeeded(true)
-      alert(`✅ تم إضافة ${count} مريض تجريبي إلى قاعدة البيانات!\n\nيمكنك الآن البحث عن:\n- نرجس\n- احمد\n- سارة\n- محمد\n- فاطمة`)
+      alert(`✅ Added ${count} test patients to the database.\n\nYou can now search for:\n- Sarah\n- Ahmed\n- John\n- Emma\n- Michael`)
       inputRef.current?.focus()
     } else {
-      alert('جميع المرضى التجريبيين موجودون بالفعل في قاعدة البيانات.')
+      alert('All test patients already exist in the database.')
     }
   }
 
@@ -187,7 +187,7 @@ export default function PatientSearch({ onPatientSelected, onPatientCleared }: P
             className="px-4 py-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/15 transition-all flex items-center gap-2 text-sm font-medium"
           >
             <Database size={18} />
-            <span>إضافة بيانات تجريبية</span>
+            <span>Add Test Data</span>
           </button>
         </div>
       )}

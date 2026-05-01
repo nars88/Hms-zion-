@@ -1,12 +1,10 @@
 'use client'
 
 import { useAuth, getRoleColor } from '@/contexts/AuthContext'
-import { useLanguage } from '@/contexts/LanguageContext'
 import { LogOut, Shield } from 'lucide-react'
 
 export default function UserProfile() {
   const { user, logout } = useAuth()
-  const { t } = useLanguage()
 
   if (!user) return null
 
@@ -69,7 +67,7 @@ export default function UserProfile() {
         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-secondary hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all border border-slate-800/30 hover:border-rose-500/30"
       >
         <LogOut size={14} />
-        <span>{t('auth.signOut')}</span>
+        <span>Sign Out</span>
       </button>
     </div>
   )

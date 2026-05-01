@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,6 +92,10 @@ async function resolveBillGeneratorId(preferredId?: string | null) {
 // POST /api/lab/er-beds/result - Save diagnostic result (Lab / Radiology / Sonar) with optional file
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['LAB_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, at, testType, result, department, attachmentPath, technicianNotes } = body
     if (!visitId || (result !== undefined && typeof result !== 'string')) {
@@ -183,13 +188,17 @@ export async function POST(request: Request) {
       resultAt: referenceAt,
     })
 
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: {
-        notes: JSON.stringify({ ...parsed, [key]: nextResults }),
-        updatedAt: new Date(),
-      },
-    })
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE visits
+      SET notes = $2,
+          "updatedAt" = $3
+      WHERE id = $1
+      `,
+      visitId,
+      JSON.stringify({ ...parsed, [key]: nextResults }),
+      new Date()
+    )
     return NextResponse.json({ success: true, completedAt, statusUpdatedToReadyForReview: false })
   } catch (e: unknown) {
     const err = e as Error

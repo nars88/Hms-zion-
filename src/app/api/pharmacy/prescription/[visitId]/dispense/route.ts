@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { VisitStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getMedicationAllergyConflicts } from '@/lib/pharmacySafety'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,21 +10,16 @@ export const dynamic = 'force-dynamic'
 // Marks prescription as dispensed, adds medication prices to invoice, updates visit status
 export async function POST(
   request: NextRequest,
-  { params }: { params: { visitId: string } }
+  { params }: { params: Promise<{ visitId: string }> }
 ) {
   try {
-    const { visitId } = params
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { visitId } = await params
     const body = await request.json()
     const { medicationPrices } = body // Array of { medicineName, price }
-
-    // Get current user (pharmacist)
-    const userIdCookie = request.cookies.get('zionmed_auth_token')
-    if (!userIdCookie?.value) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     // Find visit and related data
     const visit = await prisma.visit.findUnique({
@@ -71,7 +67,7 @@ export async function POST(
         data: {
           visitId: visit.id,
           patientId: visit.patientId,
-          generatedBy: userIdCookie.value,
+          generatedBy: user.id,
           items: [],
           subtotal: 0,
           tax: 0,
@@ -99,7 +95,7 @@ export async function POST(
         quantity: 1,
         unitPrice: med.price,
         total: med.price,
-        addedBy: userIdCookie.value,
+        addedBy: user.id,
         addedAt: new Date().toISOString(),
       }
     })

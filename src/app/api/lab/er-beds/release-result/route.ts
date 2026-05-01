@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,10 @@ async function resolveBillGeneratorId(preferredId?: string | null) {
 // POST /api/lab/er-beds/release-result — release completed lab result to doctor
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['LAB_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json().catch(() => ({}))) as {
       visitId?: string
       at?: string
@@ -131,16 +136,20 @@ export async function POST(request: Request) {
       releaseAt: String(at),
     })
 
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: {
-        notes: JSON.stringify({
-          ...parsed,
-          labResults: list,
-        }),
-        updatedAt: new Date(),
-      },
-    })
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE visits
+      SET notes = $2,
+          "updatedAt" = $3
+      WHERE id = $1
+      `,
+      visitId,
+      JSON.stringify({
+        ...parsed,
+        labResults: list,
+      }),
+      new Date()
+    )
 
     return NextResponse.json({ success: true, releasedAt })
   } catch (e: unknown) {

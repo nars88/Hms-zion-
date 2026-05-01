@@ -126,7 +126,7 @@ export default function AccountantArchivePage() {
       allowedRoles={[USER_ROLES.ACCOUNTANT, USER_ROLES.ADMIN]}
       redirectTo="/"
     >
-      <div className="flex h-screen bg-[#0B1120] overflow-hidden">
+      <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SmartSidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <main className="flex-1 overflow-auto px-6 pt-6 pb-6">

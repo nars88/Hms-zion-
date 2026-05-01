@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getRequestUser } from '@/lib/apiAuth'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 import { logEmergencyActivity } from '@/lib/emergencyActivity'
 import { mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
 
 export const dynamic = 'force-dynamic'
 
 type DiagnosticDepartment = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
+type DiagnosticRequestItem = {
+  department?: DiagnosticDepartment
+  testName?: string
+  content?: string
+  note?: string
+  priority?: string
+}
 const DEPARTMENT_TO_TYPE: Record<DiagnosticDepartment, string> = {
   Lab: 'LAB_REQUESTED',
   Radiology: 'RADIOLOGY_REQUESTED',
@@ -90,22 +97,66 @@ async function resolveBillGeneratorId(preferredId?: string | null) {
 // POST /api/emergency/doctor/lab-request - Append lab / X-Ray / Sonar request
 export async function POST(request: Request) {
   try {
-    const user = await getRequestUser(request).catch(() => null)
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
-    const { visitId, content, department } = body
-    if (!visitId || !content || !String(content).trim()) {
-      return NextResponse.json({ error: 'visitId and content required' }, { status: 400 })
+    const { visitId, content, department } = body as {
+      visitId?: string
+      content?: string
+      department?: DiagnosticDepartment
+      items?: DiagnosticRequestItem[]
     }
-    const dept: DiagnosticDepartment =
-      department === 'ECG'
-        ? 'ECG'
-        : department === 'Radiology' || department === 'Sonar'
-          ? department
-          : 'Lab'
-    const visit = await prisma.visit.findUnique({
-      where: { id: visitId },
-      select: { id: true, notes: true, patientId: true, doctorId: true },
-    })
+    if (!visitId) {
+      return NextResponse.json({ error: 'visitId required' }, { status: 400 })
+    }
+
+    const normalizedItems: Array<{ department: DiagnosticDepartment; testLabel: string; note?: string; priority?: string }> =
+      Array.isArray(body?.items) && body.items.length > 0
+        ? body.items
+            .map((item: DiagnosticRequestItem) => {
+              const dept: DiagnosticDepartment =
+                item?.department === 'ECG'
+                  ? 'ECG'
+                  : item?.department === 'Radiology' || item?.department === 'Sonar'
+                    ? item.department
+                    : 'Lab'
+              const testLabel = String(item?.testName || item?.content || '').trim()
+              return {
+                department: dept,
+                testLabel,
+                note: typeof item?.note === 'string' ? item.note.trim() : undefined,
+                priority: typeof item?.priority === 'string' ? item.priority.trim() : undefined,
+              }
+            })
+            .filter((item: { testLabel: string }) => item.testLabel.length > 0)
+        : (() => {
+            const fallbackLabel = String(content || '').trim()
+            if (!fallbackLabel) return []
+            const dept: DiagnosticDepartment =
+              department === 'ECG'
+                ? 'ECG'
+                : department === 'Radiology' || department === 'Sonar'
+                  ? department
+                  : 'Lab'
+            return [{ department: dept, testLabel: fallbackLabel }]
+          })()
+
+    if (normalizedItems.length === 0) {
+      return NextResponse.json({ error: 'At least one diagnostic item is required' }, { status: 400 })
+    }
+
+    const visitRows = await prisma.$queryRawUnsafe<Array<{ id: string; notes: string | null; patientId: string; doctorId: string | null }>>(
+      `
+      SELECT id, notes, "patientId", "doctorId"
+      FROM visits
+      WHERE id = $1
+      LIMIT 1
+      `,
+      visitId
+    )
+    const visit = visitRows[0]
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
 
     let parsed: Record<string, unknown> = {}
@@ -113,42 +164,60 @@ export async function POST(request: Request) {
       if (visit.notes) parsed = JSON.parse(visit.notes) as Record<string, unknown>
     } catch (_) {}
     const erOrders = (parsed.erOrders as Array<{ type: string; content?: string; at: string; status?: string; department?: string }>) || []
-    const orderAt = new Date().toISOString()
-    const cleanContent = String(content).trim()
-    erOrders.push({
-      type: DEPARTMENT_TO_TYPE[dept],
-      content: cleanContent,
-      at: orderAt,
-      status: 'PENDING',
-      department: dept,
-    })
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: { notes: JSON.stringify({ ...parsed, erOrders }), updatedAt: new Date() },
-    })
+    const orderTimes: string[] = []
+    for (let idx = 0; idx < normalizedItems.length; idx += 1) {
+      const item = normalizedItems[idx]
+      const orderAt = new Date(Date.now() + idx).toISOString()
+      orderTimes.push(orderAt)
+      const detail = [item.testLabel, item.note].filter(Boolean).join(' | ')
+      erOrders.push({
+        type: DEPARTMENT_TO_TYPE[item.department],
+        content: detail,
+        at: orderAt,
+        status: item.priority?.toUpperCase() === 'URGENT' ? 'URGENT' : 'PENDING',
+        department: item.department,
+      })
+    }
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE visits
+      SET notes = $2, "updatedAt" = $3
+      WHERE id = $1
+      `,
+      visitId,
+      JSON.stringify({ ...parsed, erOrders }),
+      new Date()
+    )
     const generatorId = await resolveBillGeneratorId(visit.doctorId || user?.id || null)
     if (!generatorId) {
       return NextResponse.json({ error: 'No valid billing user available' }, { status: 500 })
     }
 
-    await addDiagnosticBillingItem({
-      visitId,
-      patientId: visit.patientId,
-      generatedBy: generatorId,
-      department: dept,
-      testLabel: cleanContent,
-      orderAt,
-      addedBy: generatorId,
-    })
+    for (let idx = 0; idx < normalizedItems.length; idx += 1) {
+      const item = normalizedItems[idx]
+      await addDiagnosticBillingItem({
+        visitId,
+        patientId: visit.patientId,
+        generatedBy: generatorId,
+        department: item.department,
+        testLabel: item.testLabel,
+        orderAt: orderTimes[idx],
+        addedBy: generatorId,
+      })
+    }
 
     await logEmergencyActivity({
       visitId,
       action: 'Diagnostic Requested',
-      details: `${dept} - ${cleanContent}`,
+      details: normalizedItems.map((i) => `${i.department} - ${i.testLabel}`).join(' | '),
       actorUserId: user?.id ?? null,
       actorName: user?.name ?? user?.role ?? null,
     })
-    return NextResponse.json({ success: true, message: 'Lab/X-Ray request sent' })
+    return NextResponse.json({
+      success: true,
+      count: normalizedItems.length,
+      message: `${normalizedItems.length} diagnostic request(s) sent`,
+    })
   } catch (e: unknown) {
     const err = e as Error
     console.error('Error creating ER lab request:', err)

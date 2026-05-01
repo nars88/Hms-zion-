@@ -2,7 +2,8 @@
 
 interface QuickActionsProps {
   onNewPatient: () => void
-  onERRegistration?: () => void
+  /** Opens dedicated ER quick flow (navigate to /reception/er-quick or admin ER modal). */
+  onERQuick?: () => void
 }
 
 const actions = [
@@ -15,7 +16,7 @@ const actions = [
     hoverColor: 'hover:bg-cyan-500/15',
   },
   { 
-    label: 'ER Registration', 
+    label: 'ER Quick Reception', 
     icon: '🚨', 
     bgColor: 'bg-rose-500/10',
     borderColor: 'border-rose-500/20',
@@ -26,13 +27,13 @@ const actions = [
 
 export default function QuickActions({
   onNewPatient,
-  onERRegistration,
+  onERQuick,
 }: QuickActionsProps) {
   const handleAction = (action: typeof actions[0]) => {
     if (action.label === 'New Patient') {
       onNewPatient()
-    } else if (action.label === 'ER Registration') {
-      onERRegistration?.()
+    } else if (action.label === 'ER Quick Reception') {
+      onERQuick?.()
     }
   }
 

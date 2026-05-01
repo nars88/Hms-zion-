@@ -10,7 +10,8 @@ interface DispensingDashboardProps {
 
 // Normalize order so we always have prescription array, diagnosis text, and diagnosticResults (Lab + Radiology)
 function normalizeOrder(order: any) {
-  const prescription = order.prescription ?? (order.items?.map((i: any) => ({
+  const sourceRows = order.prescription ?? (order.items?.map((i: any) => ({
+    medicationId: i.medicationId ?? i.inventoryId ?? '',
     medication: i.medicineName ?? i.medication ?? '—',
     dosage: i.dosage ?? '—',
     frequency: i.frequency ?? i.instructions ?? '—',
@@ -21,6 +22,20 @@ function normalizeOrder(order: any) {
     price: Number(i.price ?? i.unitPrice ?? 0),
     notes: i.notes,
   })) ?? [])
+  const grouped = new Map<string, any>()
+  for (const row of sourceRows) {
+    const key =
+      String(row.medicationId || '').trim() ||
+      [String(row.medication || '').toLowerCase(), String(row.dosage || '').toLowerCase(), String(row.frequency || '').toLowerCase()].join('|')
+    const current = grouped.get(key)
+    if (!current) {
+      grouped.set(key, { ...row, quantity: Math.max(1, Number(row.quantity) || 1) })
+      continue
+    }
+    current.quantity += Math.max(1, Number(row.quantity) || 1)
+    current.totalPrice = Number(current.unitPrice || 0) * Number(current.quantity || 1)
+  }
+  const prescription = Array.from(grouped.values())
   const diagnosis = order.diagnosis ?? order.chiefComplaint ?? 'No diagnosis recorded.'
   const diagnosticResults = order.diagnosticResults
   const allergies = order.allergies ?? order.patientAllergies ?? []
@@ -40,6 +55,18 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
   const [actionToast, setActionToast] = useState<string | null>(null)
   const [draftPrescription, setDraftPrescription] = useState<any[]>(order.prescription)
   const [inventoryRows, setInventoryRows] = useState<Array<{ drugName: string; currentStock: number }>>([])
+  const toSafeDispenseError = (message?: string) => {
+    const raw = String(message || '').trim()
+    const normalized = raw.toLowerCase()
+    if (
+      normalized.includes('invalid invocation') ||
+      normalized.includes('invalid `prisma') ||
+      normalized.includes('prisma client')
+    ) {
+      return 'Dispense failed due to a temporary backend issue. Please retry.'
+    }
+    return raw || 'Failed to dispense order'
+  }
   const hasAllergyConflict = Boolean(allergyCheck?.hasConflicts)
   const hasDraftItems = draftPrescription.length > 0
   const computedDraftTotal = useMemo(
@@ -51,6 +78,8 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
       }, 0),
     [draftPrescription]
   )
+  const currentBillSubtotal = Number((order as any).currentBillSubtotal || 0)
+  const structuredGrandTotal = currentBillSubtotal + computedDraftTotal
 
   useEffect(() => {
     try {
@@ -159,7 +188,7 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
 
       if (!orderRes.ok) {
         const data = (await orderRes.json().catch(() => ({}))) as { error?: string }
-        setActionError(data.error || 'Failed to dispense order')
+        setActionError(toSafeDispenseError(data.error))
         return
       }
 
@@ -200,7 +229,7 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
 
       setTimeout(() => onDispensed(), 2000)
     } catch (e) {
-      setActionError((e as Error)?.message || 'Failed to dispense order')
+      setActionError(toSafeDispenseError((e as Error)?.message))
       setActionToast('Dispense API failed. You can retry or use decline to close.')
       setTimeout(() => setActionToast(null), 1800)
     } finally {
@@ -323,7 +352,7 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-[1.65rem] leading-tight font-extrabold tracking-tight text-[#38bdf8]">
-                        {String(med.medication || med.medicineName || 'Medication')}
+                        {String(med.medication || med.medicineName || 'Medication')} (x{Number(med.quantity) || 1})
                       </h4>
                       <button
                         type="button"
@@ -421,7 +450,11 @@ export default function DispensingDashboard({ order: rawOrder, onDispensed }: Di
             <div className="flex-shrink-0 p-4 pt-2 border-t border-slate-700/50">
               <div className="mb-3 rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-3 py-2">
                 <p className="text-[11px] text-cyan-200">
-                  Structured Total: <span className="font-bold">{computedDraftTotal.toLocaleString('en-US')} IQD</span>
+                  Structured Total: <span className="font-bold">{structuredGrandTotal.toLocaleString('en-US')} IQD</span>
+                </p>
+                <p className="mt-1 text-[10px] text-cyan-100/80">
+                  Current Bill Subtotal: {currentBillSubtotal.toLocaleString('en-US')} IQD + Draft Medications:{' '}
+                  {computedDraftTotal.toLocaleString('en-US')} IQD
                 </p>
               </div>
               {saveDraftMessage ? (

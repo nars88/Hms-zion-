@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
-    if (!['INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+    if (!['INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
 
     const visits = await prisma.visit.findMany({
       where: {
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
       },
       select: {
         id: true,
+        chiefComplaint: true,
         patient: {
           select: {
             id: true,
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
         firstName: v.patient!.firstName,
         lastName: v.patient!.lastName,
         phone: v.patient!.phone,
+        chiefComplaint: v.chiefComplaint,
         triageLevel: v.patient!.triageLevel,
         allergies: v.patient!.allergies,
       }))

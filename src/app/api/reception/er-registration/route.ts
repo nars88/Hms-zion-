@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { createErQrPayload } from '@/lib/erQr'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +30,10 @@ function mergeNotes(existing: string | null, patch: Record<string, unknown>) {
 // Creates/updates Patient and creates an ER Visit marked with visitType=EMERGENCY in Visit.notes.
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['RECEPTIONIST', 'RECEPTION', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json().catch(() => ({}))) as Partial<Body>
 
     const fullName = safeTrim(body.fullName)
@@ -91,6 +97,8 @@ export async function POST(request: Request) {
       select: { id: true, status: true, patientId: true, notes: true },
     })
 
+    const qrPayload = createErQrPayload(patient.id, visit.id)
+
     return NextResponse.json(
       {
         success: true,
@@ -105,6 +113,7 @@ export async function POST(request: Request) {
           id: visit.id,
           status: visit.status,
         },
+        qrPayload,
       },
       { status: 201 }
     )

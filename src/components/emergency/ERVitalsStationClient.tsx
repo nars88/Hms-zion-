@@ -6,7 +6,14 @@ import { Stethoscope, LogOut, Barcode, CheckCircle2, Search, X } from 'lucide-re
 import { useAuth } from '@/contexts/AuthContext'
 
 type Resolved = { patientId: string; visitId: string | null; patientName: string }
-type SearchPatient = { id: string; firstName: string; lastName: string; phone?: string | null }
+type SearchPatient = {
+  id: string
+  firstName: string
+  lastName: string
+  phone?: string | null
+  latestVisitId?: string | null
+}
+const MANUAL_VISIT_CODE_REGEX = /^(ZION|ER)-\d{8}-\d{4}$/i
 type LastSubmission = {
   resolved: Resolved
   patientNameInput: string
@@ -17,6 +24,13 @@ type LastSubmission = {
   spo2: string
   painScale: number
 }
+type TodayReferral = {
+  visitId: string
+  patientId: string
+  patientName: string
+  referralTime: string
+  statusLabel: string
+}
 
 export function ERVitalsStationInner({ basePath }: { basePath: string }) {
   const router = useRouter()
@@ -25,6 +39,7 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
 
   const [scannerCode, setScannerCode] = useState('')
   const [resolved, setResolved] = useState<Resolved | null>(null)
+  const [resolvedChiefComplaint, setResolvedChiefComplaint] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [successToast, setSuccessToast] = useState<string | null>(null)
@@ -43,6 +58,8 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
   const [spo2, setSpo2] = useState('')
   const [painScale, setPainScale] = useState(0)
   const [patientNameInput, setPatientNameInput] = useState('')
+  const [todayReferrals, setTodayReferrals] = useState<TodayReferral[]>([])
+  const [referralsLoading, setReferralsLoading] = useState(false)
   const diastolicRef = useRef<HTMLInputElement | null>(null)
 
   const focusScannerInput = useCallback(() => {
@@ -50,6 +67,19 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
       scanInputRef.current?.focus()
       scanInputRef.current?.select()
     }, 30)
+  }, [])
+
+  const loadTodayReferrals = useCallback(async () => {
+    setReferralsLoading(true)
+    try {
+      const res = await fetch('/api/emergency/referrals/today')
+      const data = (await res.json().catch(() => ({}))) as { referrals?: TodayReferral[] }
+      if (res.ok && Array.isArray(data.referrals)) {
+        setTodayReferrals(data.referrals)
+      }
+    } finally {
+      setReferralsLoading(false)
+    }
   }, [])
 
   const applyResolved = useCallback(
@@ -111,12 +141,43 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
     } else {
       setResolved(null)
       setPatientNameInput('')
+      setResolvedChiefComplaint(null)
     }
   }, [searchParams])
 
   useEffect(() => {
+    let cancelled = false
+    const loadComplaint = async () => {
+      if (!resolved?.visitId) {
+        setResolvedChiefComplaint(null)
+        return
+      }
+      try {
+        const res = await fetch(`/api/visits/${encodeURIComponent(resolved.visitId)}`)
+        const data = (await res.json().catch(() => ({}))) as {
+          visit?: { chiefComplaint?: string | null }
+        }
+        if (cancelled) return
+        setResolvedChiefComplaint(data.visit?.chiefComplaint || null)
+      } catch {
+        if (!cancelled) setResolvedChiefComplaint(null)
+      }
+    }
+    void loadComplaint()
+    return () => {
+      cancelled = true
+    }
+  }, [resolved?.visitId])
+
+  useEffect(() => {
     if (!resolved && !busy) focusScannerInput()
   }, [resolved, busy, focusScannerInput])
+
+  useEffect(() => {
+    void loadTodayReferrals()
+    const id = window.setInterval(() => void loadTodayReferrals(), 15000)
+    return () => window.clearInterval(id)
+  }, [loadTodayReferrals])
 
   useEffect(() => {
     if (!manualOpen) return
@@ -131,6 +192,27 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
       setManualLoading(true)
       setManualError(null)
       try {
+        if (MANUAL_VISIT_CODE_REGEX.test(query)) {
+          const res = await fetch(`/api/scanner/resolve?code=${encodeURIComponent(query)}`)
+          const data = (await res.json()) as {
+            patientId?: string
+            visitId?: string | null
+            patientName?: string
+            error?: string
+          }
+          if (!res.ok || data.error || !data.patientId) {
+            throw new Error(data.error || 'Visit/Badge ID not found')
+          }
+          setManualResults([
+            {
+              id: data.patientId,
+              firstName: data.patientName?.trim() || 'Patient',
+              lastName: '',
+              phone: null,
+            },
+          ])
+          return
+        }
         const res = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}`)
         const data = (await res.json()) as { patients?: SearchPatient[]; error?: string }
         if (!res.ok) throw new Error(data.error || 'Search failed')
@@ -213,6 +295,7 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
       setResolved(null)
       router.replace(basePath)
       focusScannerInput()
+      await loadTodayReferrals()
     } catch (e: unknown) {
       setMsg({ type: 'err', text: 'Connection failed. Please try again.' })
     } finally {
@@ -236,7 +319,7 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
         </span>
       </div>
 
-      <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col space-y-2">
+      <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col space-y-2">
         <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10">
             <Stethoscope className="h-5 w-5 text-cyan-300" />
@@ -247,6 +330,29 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
           </div>
         </div>
 
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[300px_1fr]">
+          <aside className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-4">
+            <h3 className="mb-3 text-sm font-bold text-slate-100">Today Referrals</h3>
+            {referralsLoading ? (
+              <p className="text-xs text-slate-400">Loading...</p>
+            ) : todayReferrals.length === 0 ? (
+              <p className="text-xs text-slate-500">No referrals yet today.</p>
+            ) : (
+              <div className="space-y-2">
+                {todayReferrals.map((row) => (
+                  <div key={row.visitId} className="rounded-lg border border-slate-700/60 bg-slate-800/40 p-2.5">
+                    <p className="text-sm font-semibold text-slate-100">{row.patientName}</p>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-slate-400">{new Date(row.referralTime).toLocaleTimeString()}</p>
+                      <p className="text-[11px] font-semibold text-cyan-300">{row.statusLabel}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
+
+          <div className="min-h-0">
         {!resolved ? (
           <div className="space-y-3 pt-2">
             <input
@@ -313,6 +419,11 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
           <div className="flex h-full flex-col space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
             <div className="flex items-start justify-between gap-2">
               <div className="w-full">
+                {resolvedChiefComplaint ? (
+                  <div className="mb-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200">
+                    Chief Complaint: {resolvedChiefComplaint}
+                  </div>
+                ) : null}
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Patient Name</label>
                 <input
                   value={patientNameInput}
@@ -427,11 +538,13 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
                 onClick={() => void handleSave()}
                 className="w-full max-w-xl rounded-xl bg-cyan-500/25 px-6 py-3 text-base font-bold text-cyan-100 ring-1 ring-cyan-400/50 hover:bg-cyan-500/35 disabled:opacity-50"
               >
-                {busy ? 'Submitting...' : 'Submit to Doctor'}
+                {busy ? 'Submitting...' : 'Refer'}
               </button>
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {manualOpen ? (
@@ -455,6 +568,14 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
               <input
                 value={manualQuery}
                 onChange={(e) => setManualQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  const q = manualQuery.trim()
+                  if (!q) return
+                  e.preventDefault()
+                  setManualOpen(false)
+                  void resolveCode(q)
+                }}
                 placeholder="Type patient ID or name"
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-cyan-400"
               />
@@ -466,19 +587,24 @@ export function ERVitalsStationInner({ basePath }: { basePath: string }) {
                 <p className="text-sm text-slate-500">No matches.</p>
               ) : null}
               {manualResults.map((p) => (
-                <button
+                  <button
                   key={p.id}
                   type="button"
                   className="w-full rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-left hover:border-cyan-500/40 hover:bg-slate-800"
                   onClick={() => {
                     setManualOpen(false)
-                    void resolveCode(JSON.stringify({ type: 'ZION_ER_BADGE', patientId: p.id }))
+                      void resolveCode(
+                        typeof p.latestVisitId === 'string' && p.latestVisitId.trim()
+                          ? p.latestVisitId
+                          : JSON.stringify({ type: 'ZION_PATIENT_BADGE', patientId: p.id })
+                      )
                   }}
                 >
                   <p className="text-sm font-semibold text-slate-100">
                     {p.firstName} {p.lastName}
                   </p>
                   <p className="text-xs text-slate-400">ID: {p.id}</p>
+                  {p.latestVisitId ? <p className="text-xs text-cyan-300">Visit: {p.latestVisitId}</p> : null}
                 </button>
               ))}
             </div>

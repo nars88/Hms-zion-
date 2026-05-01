@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
+const ER_ADMISSION_MARKER = 'ER Admission Fee'
 
 // POST /api/billing/invoice/remove-item
 // Removes an item from invoice (for pending orders only)
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ACCOUNTANT', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, description } = body
 
@@ -31,6 +37,19 @@ export async function POST(request: Request) {
 
     // Parse existing items
     const existingItems = Array.isArray(bill.items) ? bill.items : []
+    const targetLine = existingItems.find((item: any) => String(item?.description || '') === String(description)) as
+      | { description?: string }
+      | undefined
+    if (
+      targetLine &&
+      String(targetLine.description || '').toLowerCase().includes(ER_ADMISSION_MARKER.toLowerCase()) &&
+      user.role !== 'ADMIN'
+    ) {
+      return NextResponse.json(
+        { error: 'ER Admission Fee cannot be removed by Accountant. Only Admin can change global pricing.' },
+        { status: 403 }
+      )
+    }
     
     // Remove item matching description
     const updatedItems = existingItems.filter((item: any) => {

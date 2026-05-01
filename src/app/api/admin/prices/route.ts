@@ -6,8 +6,12 @@ export const dynamic = 'force-dynamic'
 
 // GET /api/admin/prices
 // Returns all price settings
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     const prices = await prisma.priceSettings.findMany({
       orderBy: [
         { category: 'asc' },

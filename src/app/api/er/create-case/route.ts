@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { ensureErAdmissionBill } from '@/lib/billing/erAdmission'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
-
-const ER_ADMISSION_FEE_IQD = 50_000
 
 // POST /api/er/create-case
 // When a nurse submits an ER case: create Visit (chiefComplaint: Emergency) + Bill with ER Admission Fee.
 // patientId, patientName required; visitId optional (will create visit); generatedBy optional (userId).
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ER_NURSE', 'ER_INTAKE_NURSE', 'INTAKE_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId: providedVisitId, patientId, patientName, generatedBy } = body
 
@@ -52,43 +56,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create or find visit' }, { status: 500 })
     }
 
-    const existingBill = await prisma.bill.findUnique({
-      where: { visitId: visit.id },
-    })
-
-    if (existingBill) {
-      return NextResponse.json({
-        success: true,
-        message: 'ER case and invoice already exist',
-        visitId: visit.id,
-        patientId: visit.patientId,
-        bill: existingBill,
-      })
-    }
-
-    const erFeeItem = {
-      id: `ITEM-ER-${Date.now()}`,
-      department: 'Doctor',
-      description: 'ER Admission Fee',
-      quantity: 1,
-      unitPrice: ER_ADMISSION_FEE_IQD,
-      total: ER_ADMISSION_FEE_IQD,
-      addedAt: new Date().toISOString(),
-      addedBy: creatorId,
-    }
-
-    const bill = await prisma.bill.create({
-      data: {
-        visitId: visit.id,
-        patientId: visit.patientId,
-        generatedBy: creatorId,
-        items: [erFeeItem],
-        subtotal: ER_ADMISSION_FEE_IQD,
-        tax: 0,
-        discount: 0,
-        total: ER_ADMISSION_FEE_IQD,
-        paymentStatus: 'Pending',
-      },
+    const bill = await ensureErAdmissionBill({
+      visitId: visit.id,
+      patientId: visit.patientId,
+      generatedBy: creatorId,
     })
 
     return NextResponse.json({

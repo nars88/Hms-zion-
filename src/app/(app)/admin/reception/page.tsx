@@ -8,39 +8,12 @@ import PatientRegistrationModal from '@/components/reception/PatientRegistration
 import ERRegistrationModal from '@/components/reception/ERRegistrationModal'
 import CheckInModal from '@/components/reception/CheckInModal'
 import PatientQueue from '@/components/reception/PatientQueue'
-import AppointmentBookingModal from '@/components/reception/AppointmentBookingModal'
-import VisitQRModal from '@/components/reception/VisitQRModal'
 
 export default function AdminReceptionPage() {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false)
   const [showERRegistrationModal, setShowERRegistrationModal] = useState(false)
   const [showCheckInModal, setShowCheckInModal] = useState(false)
   const [showWaitingListModal, setShowWaitingListModal] = useState(false)
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false)
-  const [showVisitQRModal, setShowVisitQRModal] = useState(false)
-  const [workflowMessage, setWorkflowMessage] = useState<string | null>(null)
-  const [workflowPatient, setWorkflowPatient] = useState<{ patientId: string; patientName: string } | null>(null)
-  const [visitQrData, setVisitQrData] = useState<{
-    visitId: string
-    patientId: string
-    patientName: string
-    doctorName: string
-    department: string
-    appointmentDate: string
-    appointmentTime: string
-    queueNumber: number
-  } | null>(null)
-
-  // CORE WORKFLOW: REGISTER -> ASSIGN -> QR
-  const handleRegistrationSuccess = (patientId: string, patientName: string) => {
-    setShowRegistrationModal(false)
-    setWorkflowPatient({ patientId, patientName })
-    setWorkflowMessage('Success! Redirecting to Doctor Selection...')
-    window.setTimeout(() => {
-      setWorkflowMessage(null)
-      setShowAppointmentModal(true)
-    }, 500)
-  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -52,7 +25,7 @@ export default function AdminReceptionPage() {
           <div className="flex-shrink-0">
             <QuickActions
               onNewPatient={() => setShowRegistrationModal(true)}
-              onERRegistration={() => setShowERRegistrationModal(true)}
+              onERQuick={() => setShowERRegistrationModal(true)}
             />
           </div>
           <div className="flex-shrink-0">
@@ -63,48 +36,11 @@ export default function AdminReceptionPage() {
       {showRegistrationModal && (
         <PatientRegistrationModal
           onClose={() => setShowRegistrationModal(false)}
-          onRegistrationSuccess={handleRegistrationSuccess}
         />
       )}
-      {/* CORE WORKFLOW: REGISTER -> ASSIGN -> QR */}
-      {showAppointmentModal && workflowPatient ? (
-        <AppointmentBookingModal
-          onClose={() => {
-            setShowAppointmentModal(false)
-            setWorkflowPatient(null)
-          }}
-          patientId={workflowPatient.patientId}
-          patientName={workflowPatient.patientName}
-          onBookingSuccess={(data) => {
-            // CORE WORKFLOW: REGISTER -> ASSIGN -> QR
-            setShowAppointmentModal(false)
-            setVisitQrData(data)
-            setShowVisitQRModal(true)
-          }}
-        />
-      ) : null}
-      {showVisitQRModal && visitQrData ? (
-        <VisitQRModal
-          visitId={visitQrData.visitId}
-          patientName={visitQrData.patientName}
-          patientId={visitQrData.patientId}
-          doctorName={visitQrData.doctorName}
-          department={visitQrData.department}
-          appointmentDate={visitQrData.appointmentDate}
-          appointmentTime={visitQrData.appointmentTime}
-          queueNumber={visitQrData.queueNumber}
-          onClose={() => setShowVisitQRModal(false)}
-          onDone={() => {
-            setShowVisitQRModal(false)
-            setVisitQrData(null)
-            setWorkflowPatient(null)
-          }}
-        />
-      ) : null}
       {showERRegistrationModal && (
         <ERRegistrationModal
           onClose={() => setShowERRegistrationModal(false)}
-          onRegister={() => setShowERRegistrationModal(false)}
         />
       )}
       {showCheckInModal && (
@@ -137,16 +73,6 @@ export default function AdminReceptionPage() {
           </div>
         </div>
       )}
-      {workflowMessage ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
-          <div className="rounded-xl border border-emerald-500/30 bg-slate-900/90 px-5 py-3 text-sm text-emerald-300 shadow-xl">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-              {workflowMessage}
-            </span>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

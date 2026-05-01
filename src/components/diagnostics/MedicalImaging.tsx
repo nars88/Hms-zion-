@@ -28,7 +28,7 @@ interface ImagingStudy {
 const mockStudies: ImagingStudy[] = [
   {
     id: 'dx-img-mock-1',
-    patientName: 'مريض تجريبي أ — Demo Alpha',
+    patientName: 'Test Patient A - Demo Alpha',
     patientId: 'DX-MOCK-IMG-01',
     studyType: 'CT',
     bodyPart: 'Chest',
@@ -38,7 +38,7 @@ const mockStudies: ImagingStudy[] = [
   },
   {
     id: 'dx-img-mock-2',
-    patientName: 'مريض تجريبي ب — Demo Beta',
+    patientName: 'Test Patient B - Demo Beta',
     patientId: 'DX-MOCK-IMG-02',
     studyType: 'MRI',
     bodyPart: 'Brain',

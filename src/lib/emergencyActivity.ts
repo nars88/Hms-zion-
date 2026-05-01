@@ -8,16 +8,17 @@ export async function logEmergencyActivity(input: {
   actorName?: string | null
 }) {
   try {
-    await prisma.activityHistory.create({
-      data: {
-        visitId: input.visitId,
-        action: input.action,
-        details: input.details,
-        actorUserId: input.actorUserId ?? null,
-        actorName: input.actorName ?? null,
-      },
-    })
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO activity_history (visit_id, action, details, actor_user_id, actor_name, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      input.visitId,
+      input.action,
+      input.details ?? null,
+      input.actorUserId ?? null,
+      input.actorName ?? null
+    )
   } catch (error) {
+    // Non-blocking by design: patient flow must continue even if activity storage is unavailable.
     console.error('Failed to log emergency activity:', error)
   }
 }

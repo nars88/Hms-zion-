@@ -29,8 +29,8 @@ import {
   Microscope,
   Scan
 } from 'lucide-react'
-import { useLanguage } from '@/contexts/LanguageContext'
 import { useStats } from '@/contexts/StatsContext'
+import { formatNumber } from '@/lib/locale'
 
 interface ERFastTrackAreaProps {
   patient: any
@@ -74,7 +74,6 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
   const { getInvoice, getInvoiceByPatientId, createInvoice, addInvoiceItem } = useCentralizedBilling()
   const { deductStock, findMedicineByName } = useInventory()
   const { addLabRequest } = useLabResults()
-  const { t, isRTL, formatNumber } = useLanguage()
   const { recordProcedureClick } = useStats()
   
   const [diagnosis, setDiagnosis] = useState('')
@@ -424,7 +423,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
             <p>Grand Total: ${invoice.total.toLocaleString('en-US')} IQD</p>
           </div>
           <div class="footer">
-            <p>Thank you for choosing ZION Hospital</p>
+            <p>Thank you for choosing NARS Hospital</p>
             <p>Generated on ${new Date().toLocaleString('en-US')}</p>
           </div>
         </body>
@@ -458,10 +457,10 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
           <AlertTriangle className="text-red-500" size={22} />
           <div>
             <h2 className="text-lg font-bold text-slate-900">{patient.name}</h2>
-            <span className="text-base text-red-600 font-bold uppercase tracking-wide">{t('er.title')}</span>
+            <span className="text-base text-red-600 font-bold uppercase tracking-wide">Emergency Room</span>
           </div>
           <span className="text-base font-medium text-slate-600">
-            {formatNumber(patient.age)} {t('common.years')}, {patient.gender} • ID: {patient.id}
+            {formatNumber(patient.age)} years, {patient.gender} • ID: {patient.id}
           </span>
         </div>
       {onBackToQueue && (
@@ -471,7 +470,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
             style={{ borderRadius: '8px' }}
           >
             <ArrowLeft size={18} />
-            <span>{t('er.backToQueue')}</span>
+            <span>Back to Queue</span>
           </button>
         )}
         </div>
@@ -492,7 +491,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-base font-bold text-slate-700">Age</p>
-                  <p className="text-lg font-bold text-slate-900">{formatNumber(patient.age)} {t('common.years')}</p>
+                  <p className="text-lg font-bold text-slate-900">{formatNumber(patient.age)} years</p>
                 </div>
                 <div>
                   <p className="text-base font-bold text-slate-700">Gender</p>
@@ -560,7 +559,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
           <div className="bg-white rounded-lg border border-[#E2E8F0] p-3 flex-shrink-0 shadow-sm">
             <h3 className="text-base font-bold text-slate-700 mb-3 flex items-center gap-2">
               <Siren size={22} className="text-red-500" />
-              <span>{t('er.emergencyProcedures')}</span>
+              <span>Emergency Procedures</span>
             </h3>
             
             {/* ER Procedure Buttons - Square Grid */}
@@ -577,7 +576,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
                 style={{ borderRadius: '8px' }}
               >
                 <Droplet size={32} className="mb-2" />
-                <span className="text-base font-bold text-center mb-1">{t('er.ivFluid')}</span>
+                <span className="text-base font-bold text-center mb-1">IV Fluid</span>
                 <span className="text-sm font-bold">{formatNumber(25000)} IQD</span>
                 {appliedProcedures.includes('iv-fluid') && (
                   <div className="absolute top-2 right-2">
@@ -598,7 +597,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
                 style={{ borderRadius: '8px' }}
               >
                 <Syringe size={32} className="mb-2" />
-                <span className="text-base font-bold text-center mb-1">{t('er.injection')}</span>
+                <span className="text-base font-bold text-center mb-1">Injection</span>
                 <span className="text-sm font-bold">{formatNumber(15000)} IQD</span>
                 {appliedProcedures.includes('injection') && (
                   <div className="absolute top-2 right-2">
@@ -619,7 +618,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
                 style={{ borderRadius: '8px' }}
               >
                 <Package size={32} className="mb-2" />
-                <span className="text-base font-bold text-center mb-1">{t('er.woundDressing')}</span>
+                <span className="text-base font-bold text-center mb-1">Wound Dressing</span>
                 <span className="text-sm font-bold">{formatNumber(5000)} IQD</span>
                 {appliedProcedures.includes('wound-dressing') && (
                   <div className="absolute top-2 right-2">
@@ -640,7 +639,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
                 style={{ borderRadius: '8px' }}
               >
                 <Scissors size={32} className="mb-2" />
-                <span className="text-base font-bold text-center mb-1">{t('er.stitching')}</span>
+                <span className="text-base font-bold text-center mb-1">Stitching</span>
                 <span className="text-sm font-bold">{formatNumber(35000)} IQD</span>
                 {appliedProcedures.includes('stitching') && (
                   <div className="absolute top-2 right-2">
@@ -661,7 +660,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
                 style={{ borderRadius: '8px' }}
               >
                 <Activity size={32} className="mb-2" />
-                <span className="text-base font-bold text-center mb-1">{t('er.oxygen')}</span>
+                <span className="text-base font-bold text-center mb-1">Oxygen</span>
                 <span className="text-sm font-bold">{formatNumber(20000)} IQD</span>
                 {appliedProcedures.includes('oxygen') && (
                   <div className="absolute top-2 right-2">
@@ -675,7 +674,7 @@ export default function ERFastTrackArea({ patient, onCompleteVisit, onBackToQueu
           {/* Applied Procedures Summary - Bold Typography */}
           {appliedProcedures.length > 0 && (
             <div className="bg-white rounded-lg border border-[#E2E8F0] p-3 flex-shrink-0 shadow-sm">
-              <h3 className="text-base font-bold text-slate-700 mb-2">{t('er.appliedProcedures')}</h3>
+              <h3 className="text-base font-bold text-slate-700 mb-2">Applied Procedures</h3>
               <div className="space-y-2">
                 {appliedProcedures.map((procId) => {
                   const procedure = QUICK_PROCEDURES.find((p) => p.id === procId)

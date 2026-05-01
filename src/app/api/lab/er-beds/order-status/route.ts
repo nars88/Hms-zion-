@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,10 @@ type OrderKind = 'IN_PROGRESS' | 'SAMPLE_COLLECTED' | 'COMPLETED'
 /** POST /api/lab/er-beds/order-status — set ER diagnostic order lifecycle (lab sample / tech start / done). */
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['LAB_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json().catch(() => ({}))) as {
       visitId?: string
       at?: string
@@ -51,13 +56,17 @@ export async function POST(request: Request) {
           : 'COMPLETED'
     const next = erOrders.map((o, i) => (i === idx ? { ...o, status: nextStatus } : o))
 
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: {
-        notes: JSON.stringify({ ...parsed, erOrders: next }),
-        updatedAt: new Date(),
-      },
-    })
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE visits
+      SET notes = $2,
+          "updatedAt" = $3
+      WHERE id = $1
+      `,
+      visitId,
+      JSON.stringify({ ...parsed, erOrders: next }),
+      new Date()
+    )
 
     return NextResponse.json({ success: true, kind })
   } catch (e: unknown) {

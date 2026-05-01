@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic'
 // Returns QR status for a patient (for security guard scanning)
 export async function GET(
   request: Request,
-  { params }: { params: { patientId: string } }
+  { params }: { params: Promise<{ patientId: string }> }
 ) {
   try {
-    const { patientId } = params
+    const { patientId } = await params
 
     // Find the most recent visit with a bill for this patient
     const visit = await prisma.visit.findFirst({

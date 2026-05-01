@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +8,10 @@ export const dynamic = 'force-dynamic'
 // Creates a pending invoice when booking is completed
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ACCOUNTANT', 'RECEPTIONIST', 'RECEPTION', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, patientId, patientName, status = 'Pending' } = body
 

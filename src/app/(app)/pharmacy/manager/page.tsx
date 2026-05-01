@@ -9,7 +9,7 @@ import BackButton from '@/components/BackButton'
 export default function PharmacyManagerPage() {
   return (
     <ProtectedRoute allowedRoles={['PHARMACIST', 'ADMIN']} redirectTo="/">
-      <div className="flex h-screen bg-[#0B1120] overflow-hidden">
+      <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SmartSidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <div className="p-4 border-b border-slate-800/50 bg-slate-900/30 flex-shrink-0">

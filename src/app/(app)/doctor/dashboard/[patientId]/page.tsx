@@ -756,7 +756,7 @@ function DoctorDashboardInner() {
   const techNotesEcg = selectedCase?.ecg?.technicianNotes?.trim()
 
   const xrayFindingText = useMemo(
-    () => selectedCase?.xray?.summary?.trim() || 'كسر بالضلع الثالث',
+    () => selectedCase?.xray?.summary?.trim() || 'Fracture in the third rib',
     [selectedCase?.xray?.summary]
   )
   const xrayFindingRtl = /[\u0600-\u06FF]/.test(xrayFindingText)
@@ -1116,6 +1116,12 @@ function DoctorDashboardInner() {
                       </div>
                     ) : null}
                   </div>
+                  {selectedExamPatient?.chiefComplaint ? (
+                    <div className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                      <span className="font-semibold">Chief Complaint: </span>
+                      {selectedExamPatient.chiefComplaint}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex min-h-0 flex-1 gap-4 overflow-hidden lg:gap-6">

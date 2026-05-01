@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
+    const { id } = await params
     const body = await request.json().catch(() => ({}))
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     const description = typeof body?.description === 'string' ? body.description.trim() : ''
@@ -42,7 +48,7 @@ export async function PATCH(
         hodName || null,
         hodTag || null,
         JSON.stringify(assignedEmployeeIds),
-        params.id
+        id
       )
 
       if (!result.length) return [null]
@@ -52,14 +58,14 @@ export async function PATCH(
          SET department_id = NULL
          WHERE department_id = $1
            AND NOT (id = ANY($2::text[]))`,
-        params.id,
+        id,
         assignedEmployeeIds
       )
 
       if (assignedEmployeeIds.length > 0) {
         await tx.$executeRawUnsafe(
           `UPDATE users SET department_id = $1 WHERE id = ANY($2::text[])`,
-          params.id,
+          id,
           assignedEmployeeIds
         )
       }
@@ -84,7 +90,7 @@ export async function PATCH(
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   return PATCH(request, context)
 }

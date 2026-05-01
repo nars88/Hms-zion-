@@ -24,6 +24,14 @@ export async function GET() {
             chiefComplaint: true,
             status: true,
             patientId: true,
+            bill: {
+              select: {
+                subtotal: true,
+                tax: true,
+                discount: true,
+                total: true,
+              },
+            },
             patient: {
               select: {
                 id: true,
@@ -61,6 +69,10 @@ export async function GET() {
         bedNumber: (v as { bedNumber?: number | null }).bedNumber ?? null,
         chiefComplaint: v.chiefComplaint,
         visitStatus: v.status,
+        currentBillSubtotal: Number(v.bill?.subtotal || 0),
+        currentBillTax: Number(v.bill?.tax || 0),
+        currentBillDiscount: Number(v.bill?.discount || 0),
+        currentBillTotal: Number(v.bill?.total || 0),
       }
     })
 

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
+const ER_BEDS_CACHE_TTL_MS = 3000
+const erBedsCache = new Map<string, { at: number; data: unknown[] }>()
 
 const TOTAL_BEDS = 12
 
@@ -37,6 +39,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const department = (searchParams.get('department') || 'Lab') as DiagnosticDepartment
+    const cacheKey = `dept:${department}`
+    const cached = erBedsCache.get(cacheKey)
+    if (cached && Date.now() - cached.at < ER_BEDS_CACHE_TTL_MS) {
+      return NextResponse.json(cached.data)
+    }
     const orderTypes = DEPARTMENT_ORDER_TYPES[department] ?? DEPARTMENT_ORDER_TYPES.Lab
     const resultsKey = DEPARTMENT_RESULTS_KEY[department] ?? 'labResults'
     const visits = await prisma.visit.findMany({
@@ -203,6 +210,7 @@ export async function GET(request: Request) {
       }
     }
 
+    erBedsCache.set(cacheKey, { at: Date.now(), data: beds })
     return NextResponse.json(beds)
   } catch (e) {
     console.error('Error fetching ER lab beds:', e)

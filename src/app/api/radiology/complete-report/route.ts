@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServicePrice, mapTestToServiceType, getDefaultPrice } from '@/lib/priceService'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,10 @@ export const dynamic = 'force-dynamic'
 // Completes a radiology report and adds the price to invoice
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['RADIOLOGY_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, patientId, studyType, bodyPart, findings, impression, completedBy } = body
 

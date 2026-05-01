@@ -68,6 +68,7 @@ export type ResultCardType = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 export type Severity = 'Red' | 'Yellow' | 'Green'
 
 export interface ERTask {
+  taskId?: string
   visitId: string
   patientName: string
   bedNumber: number | null

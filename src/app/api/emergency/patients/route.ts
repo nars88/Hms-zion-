@@ -2,19 +2,44 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import { orderHasReleasedImagingResult } from '@/lib/imagingRelease'
+import { getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
+const ER_PATIENTS_CACHE_TTL_MS = 4000
+const erPatientsCache = new Map<string, { at: number; data: unknown[] }>()
+
+const ER_VISIT_OR = [
+  { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' as const } },
+  { chiefComplaint: { contains: 'ER', mode: 'insensitive' as const } },
+  { status: VisitStatus.REGISTERED },
+  { status: VisitStatus.WITH_DOCTOR },
+  { status: VisitStatus.WAITING_FOR_DOCTOR },
+] as const
 
 // GET /api/emergency/patients
-// Returns active ER patients (not discharged / not completed — finished visits leave the board)
-export async function GET() {
+// Role-scoped: intake nurse sees REGISTERED only; ER doctor sees WITH_DOCTOR only; admin sees all ER-active.
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    const cacheKey = `role:${user.role}`
+    const cached = erPatientsCache.get(cacheKey)
+    if (cached && Date.now() - cached.at < ER_PATIENTS_CACHE_TTL_MS) {
+      return NextResponse.json(cached.data)
+    }
+
+    const roleStatus =
+      user.role === 'ER_INTAKE_NURSE'
+        ? ({ status: VisitStatus.REGISTERED } as const)
+        : user.role === 'DOCTOR'
+          ? ({ status: VisitStatus.WITH_DOCTOR } as const)
+          : null
+
     const visits = await prisma.visit.findMany({
       where: {
-        status: { notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED] },
-        OR: [
-          { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-          { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
+        AND: [
+          { status: { notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED] } },
+          roleStatus ? roleStatus : { OR: [...ER_VISIT_OR] },
         ],
       },
       orderBy: { createdAt: 'desc' },
@@ -81,6 +106,7 @@ export async function GET() {
       let sonarUnreviewed = false
       let ecgUnreviewed = false
       let criticalAlert = false
+      let bedExitState: 'PENDING_EXIT' | 'AVAILABLE' | null = null
       try {
         const notesJson = (v as { notes?: string | null }).notes
         if (notesJson && typeof notesJson === 'string') {
@@ -117,8 +143,13 @@ export async function GET() {
             lastReviewedAt?: { Lab?: string; Radiology?: string; Sonar?: string; ECG?: string }
             erCriticalAlert?: boolean
             erCriticalAlertAt?: string
+            bedExitState?: 'PENDING_EXIT' | 'AVAILABLE'
           }
           criticalAlert = Boolean(parsed.erCriticalAlert || parsed.erCriticalAlertAt)
+          bedExitState =
+            parsed.bedExitState === 'PENDING_EXIT' || parsed.bedExitState === 'AVAILABLE'
+              ? parsed.bedExitState
+              : null
           if (parsed.erOrders) erOrders = parsed.erOrders as typeof erOrders
           const nurseOrders = erOrders.filter((o) => o.type === 'NURSE_TASK')
           if (nurseOrders.length > 0) {
@@ -260,6 +291,7 @@ export async function GET() {
         nurseTasksPending,
         nurseTasksComplete,
         criticalAlert,
+        bedExitState,
         vitals: latestVitals
           ? {
               bp: latestVitals.bp,
@@ -278,6 +310,7 @@ export async function GET() {
   })
       .filter((x): x is NonNullable<typeof x> => x != null)
 
+    erPatientsCache.set(cacheKey, { at: Date.now(), data: list })
     return NextResponse.json(list)
   } catch (e) {
     console.error('Error fetching emergency patients:', e)

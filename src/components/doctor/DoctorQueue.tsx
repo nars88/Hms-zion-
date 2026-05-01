@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { AlertTriangle, PhoneCall, ClipboardList } from 'lucide-react'
-import { useLanguage } from '@/contexts/LanguageContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { formatNumber } from '@/lib/locale'
 
 interface DoctorQueueItem {
   visitId: string
@@ -119,7 +119,6 @@ export default function DoctorQueue({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [callingBack, setCallingBack] = useState<string | null>(null)
-  const { t, formatNumber } = useLanguage()
   const { user } = useAuth()
   const isSecretary = user?.role === 'SECRETARY'
 
@@ -198,10 +197,10 @@ export default function DoctorQueue({
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="p-4 border-b border-slate-800/50 flex-shrink-0">
         <h2 className="text-base font-semibold text-primary mb-0.5">
-          {isSecretary ? t('patient.waiting') + ' / Ready for Review' : t('patient.waiting')}
+          {isSecretary ? 'Waiting Patients / Ready for Review' : 'Waiting Patients'}
         </h2>
         <p className="text-xs text-secondary">
-          {formatNumber(totalWaiting)} {t('common.inQueue')}
+          {formatNumber(totalWaiting)} in queue
           {readyForReview.length > 0 && (
             <span className="ml-2 text-amber-400 font-semibold">
               • {readyForReview.length} Ready for Review
@@ -344,7 +343,7 @@ export default function DoctorQueue({
                       )}
                     </div>
                     <p className="text-[11px] text-red-300/80 mt-0.5">
-                      {p.age !== null ? `${formatNumber(p.age)} ${t('common.years')}` : 'Age N/A'}
+                      {p.age !== null ? `${formatNumber(p.age)} years` : 'Age N/A'}
                       {', '}
                       {p.gender || 'N/A'}
                     </p>
@@ -414,7 +413,7 @@ export default function DoctorQueue({
                       )}
                     </div>
                     <p className="text-[11px] text-secondary mt-0.5">
-                      {p.age !== null ? `${formatNumber(p.age)} ${t('common.years')}` : 'Age N/A'}
+                      {p.age !== null ? `${formatNumber(p.age)} years` : 'Age N/A'}
                       {', '}
                       {p.gender || 'N/A'}
                     </p>

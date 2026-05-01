@@ -42,3 +42,7 @@ next-env.d.ts
 # prisma
 /prisma/migrations
 
+# uploaded branding logos (keep folder)
+/public/uploads/branding/*
+!/public/uploads/branding/.gitkeep
+

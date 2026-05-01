@@ -348,7 +348,7 @@ export default function LabTechDashboard() {
       </head>
       <body>
         <div class="header">
-          <div class="hospital">ZION Hospital</div>
+          <div class="hospital">NARS Hospital</div>
           <div class="sub">Laboratory Result</div>
         </div>
         <div class="meta">

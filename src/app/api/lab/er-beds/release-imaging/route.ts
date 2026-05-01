@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import type { ImagingResultRecord } from '@/lib/imagingRelease'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,10 @@ const RESULT_KEYS = {
 // POST /api/lab/er-beds/release-imaging — technician sends reviewed imaging to the doctor
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['LAB_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = (await request.json().catch(() => ({}))) as {
       visitId?: string
       at?: string
@@ -73,19 +78,24 @@ export async function POST(request: Request) {
       ] as VisitStatus[]
     ).includes(visit.status)
 
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: {
-        notes: JSON.stringify({
-          ...parsed,
-          erOrders: updatedErOrders,
-          lastResultAt,
-          [key]: list,
-        }),
-        ...(advanceToClinicalQueue && { status: VisitStatus.READY_FOR_REVIEW }),
-        updatedAt: new Date(),
-      },
-    })
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE visits
+      SET notes = $2,
+          status = COALESCE($3::"VisitStatus", status),
+          "updatedAt" = $4
+      WHERE id = $1
+      `,
+      visitId,
+      JSON.stringify({
+        ...parsed,
+        erOrders: updatedErOrders,
+        lastResultAt,
+        [key]: list,
+      }),
+      advanceToClinicalQueue ? VisitStatus.READY_FOR_REVIEW : null,
+      new Date()
+    )
 
     if (department === 'Sonar') {
       const img = typeof list[idx].attachmentPath === 'string' ? list[idx].attachmentPath.trim() : ''

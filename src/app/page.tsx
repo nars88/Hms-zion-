@@ -13,13 +13,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
-
-const BRAND = {
-  name: 'ZION MED',
-  wordmark: 'ZION',
-  accent: 'MED',
-  tagline: 'Hospital Intelligence',
-}
+import { useBranding } from '@/contexts/BrandingContext'
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
@@ -27,8 +21,10 @@ const NAV_LINKS = [
 ]
 
 export default function LandingPage() {
+  const { systemName, logoUrl } = useBranding()
+
   return (
-    <div className="min-h-screen bg-[#020b18] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-primary text-primary overflow-x-hidden">
       {/* Ambient page glows — single compound radial-gradient layer (no CSS blur,
           gradient is already soft). Replaces the previous 3× blur-[140px] + masked
           grid which were the main culprit of first-paint lag. */}
@@ -46,15 +42,18 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="relative grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/20 to-fuchsia-500/20 shadow-[inset_0_0_12px_rgba(34,211,238,0.35)]">
-              <span className="text-base font-black text-cyan-300">Z</span>
+            <div className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/20 to-fuchsia-500/20 shadow-[inset_0_0_12px_rgba(34,211,238,0.35)]">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-base font-black text-cyan-300">
+                  {(systemName || 'Z').trim().charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
             <div className="leading-none">
-              <p className="text-base font-black tracking-tight">
-                <span className="text-white">{BRAND.wordmark}</span>{' '}
-                <span className="text-emerald-400">{BRAND.accent}</span>
-              </p>
-              <p className="mt-1 text-[11px] font-medium text-slate-500">{BRAND.tagline}</p>
+              <p className="text-base font-black tracking-tight text-white">{systemName}</p>
+              <p className="mt-1 text-[11px] font-medium text-slate-500">Hospital Intelligence</p>
             </div>
           </Link>
 
@@ -117,7 +116,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="mt-7 max-w-xl text-lg leading-relaxed text-slate-400">
-              {BRAND.name} unifies triage, diagnostics, pharmacy, billing, and secure discharge into one
+              {systemName} unifies triage, diagnostics, pharmacy, billing, and secure discharge into one
               command center — purpose-built for modern hospital operations.
             </p>
 
@@ -558,7 +557,7 @@ export default function LandingPage() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Contact</p>
           <h2 className="text-5xl font-black tracking-tight text-white">Get in Touch</h2>
           <p className="mt-5 text-base text-slate-400">
-            Ready to see {BRAND.name} in action? Reach us directly.
+            Ready to see {systemName} in action? Reach us directly.
           </p>
           <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
             <a
@@ -621,15 +620,18 @@ export default function LandingPage() {
       <footer className="relative z-10 border-t border-white/5 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="grid h-7 w-7 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-500/20">
-              <span className="text-xs font-black text-cyan-300">Z</span>
+            <div className="grid h-7 w-7 place-items-center overflow-hidden rounded-lg border border-cyan-400/30 bg-cyan-500/20">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-black text-cyan-300">
+                  {(systemName || 'Z').trim().charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
-            <span className="text-sm font-bold">
-              <span className="text-slate-200">{BRAND.wordmark}</span>{' '}
-              <span className="text-emerald-400">{BRAND.accent}</span>
-            </span>
+            <span className="text-sm font-bold text-slate-200">{systemName}</span>
           </div>
-          <p className="text-xs text-slate-600">© 2025 {BRAND.name}. All rights reserved.</p>
+          <p className="text-xs text-slate-600">© 2025 {systemName}. All rights reserved.</p>
           <div className="flex items-center gap-5 text-xs text-slate-500">
             <a href="#features" className="transition-colors hover:text-slate-200">Product</a>
             <a href="#roles" className="transition-colors hover:text-slate-200">Use Cases</a>

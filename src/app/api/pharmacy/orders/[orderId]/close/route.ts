@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus, VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +11,14 @@ export const dynamic = 'force-dynamic'
 // Doctor and Pharmacist can view these records later in Patient History or Reports.
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const orderId = params.orderId
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { orderId } = await params
 
     const order = await prisma.medicationOrder.findUnique({
       where: { id: orderId },

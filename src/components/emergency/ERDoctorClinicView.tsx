@@ -14,6 +14,8 @@ import {
   FileText,
   LayoutGrid,
   ListTodo,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ERPatient, ResultCardType } from '@/types/er'
@@ -25,8 +27,57 @@ import {
   isSimVisitId,
   readSimulationFlagFromUrl,
 } from '@/lib/diagnosticUiSim'
+import { subscribeResultReady } from '@/lib/erClinicalBroadcast'
+import { playErResultReadyChime } from '@/lib/erNotificationSound'
 
 const TOTAL_BEDS = 12
+const DEV_MOCK_ENABLED = process.env.NODE_ENV === 'development'
+const DEV_MOCK_PATIENT: ERPatient = {
+  visitId: 'DEV-MOCK-ER-VISIT-01',
+  patientId: 'DEV-MOCK-PATIENT-01',
+  name: 'حوراء باخت (اختبار)',
+  age: 29,
+  gender: 'Female',
+  chiefComplaint: 'Emergency admission - UI/UX mock',
+  status: 'ADMITTED',
+  triageLevel: 2,
+  bedNumber: 1,
+  hasLabRequest: false,
+  hasRadiologyRequest: false,
+  hasSonarRequest: false,
+  hasEcgRequest: false,
+  hasPendingDiagnostics: false,
+  billingStatus: 'waiting_for_payment',
+  pharmacyOrderStatus: 'PENDING',
+  medicineReady: true,
+  pharmacyOutOfStock: false,
+  doctorMedications: [
+    'PRESCRIBED: Ibuprofen 400mg - q8h for 3 days',
+    'DISPENSED: Paracetamol 500mg - q6h for 2 days',
+  ].join('\n'),
+  erOrders: [
+    {
+      type: 'VISIT_TYPE',
+      content: 'EMERGENCY - NARS Hospital - Bed ID: ER-BED-01',
+      at: new Date().toISOString(),
+      status: 'DONE',
+    },
+    {
+      type: 'BILLING',
+      content: 'ER Admission Fee linked: 10,000 IQD',
+      at: new Date().toISOString(),
+      status: 'DONE',
+    },
+  ],
+  vitals: {
+    bp: '118/76',
+    temperature: 37,
+    heartRate: 88,
+    weight: 64,
+    spo2: 98,
+    recordingSource: 'ER-Vitals',
+  },
+}
 
 function resultsArrivedTab(p: ERPatient) {
   return Boolean(p.labReady || p.radiologyReady || p.sonarReady || p.ecgReady)
@@ -41,6 +92,103 @@ function activeQueueTab(p: ERPatient) {
       p.sonarUnreviewed ||
       p.ecgUnreviewed
   )
+}
+
+function getLatestDiagnosticFromNotes(
+  notes: string | null | undefined,
+  type: ResultCardType
+): { summary: string; attachmentPath?: string; technicianNotes?: string } | null {
+  if (!notes) return null
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    const key =
+      type === 'Lab'
+        ? 'labResults'
+        : type === 'Radiology'
+          ? 'radiologyResults'
+          : type === 'Sonar'
+            ? 'sonarResults'
+            : 'ecgResults'
+    const rows =
+      ((parsed[key] as Array<{
+        result?: string
+        attachmentPath?: string
+        technicianNotes?: string
+        completedAt?: string
+        releasedToDoctorAt?: string
+      }>) || [])
+        .slice()
+        .sort((a, b) =>
+          String(b.releasedToDoctorAt || b.completedAt || '').localeCompare(
+            String(a.releasedToDoctorAt || a.completedAt || '')
+          )
+        )
+    const latest = rows[0]
+    if (!latest) return null
+    return {
+      summary: latest.result || '',
+      attachmentPath: latest.attachmentPath,
+      technicianNotes: latest.technicianNotes,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Safe to pass to window.open / <a target=_blank> — blocks blank tabs and dangerous schemes. */
+function isNavigableAttachmentUrl(url: string): boolean {
+  const s = url.trim()
+  if (!s || /^about:blank$/i.test(s)) return false
+  if (s.startsWith('//')) return false
+  if (/^(javascript|vbscript):/i.test(s)) return false
+  try {
+    if (s.startsWith('data:image/') || s.startsWith('data:application/pdf')) {
+      return s.length < 8_000_000
+    }
+    if (s.startsWith('data:')) return false
+    if (s.startsWith('http://') || s.startsWith('https://')) {
+      const u = new URL(s)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
+      if (!u.hostname || u.hostname.length < 1) return false
+      return true
+    }
+    if (s.startsWith('/')) {
+      return s.length >= 2 && !/\s/.test(s)
+    }
+    if (s.startsWith('blob:')) {
+      return s.length < 4096
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+function resolveAttachmentUrl(rawPath?: string) {
+  if (!rawPath) return ''
+  const trimmed = rawPath.trim()
+  if (!trimmed) return ''
+  let candidate = ''
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('/')
+  ) {
+    candidate = trimmed
+  } else if (trimmed.includes('/storage/v1/object/public/')) {
+    candidate = trimmed
+  } else {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    if (!supabaseUrl) candidate = trimmed
+    else {
+      const normalizedPath = trimmed.replace(/^\/+/, '')
+      if (!normalizedPath) return ''
+      candidate = `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/${normalizedPath}`
+    }
+  }
+  return isNavigableAttachmentUrl(candidate) ? candidate : ''
 }
 
 /** Main ER clinic board + tabs (no layout chrome — wrap with ERRoleSidebar in `/er/clinic`). */
@@ -61,10 +209,13 @@ export function ERDoctorClinicShell() {
       if (!res.ok) throw new Error('Failed to load ER patients')
       const rawList = await res.json()
       const apiList = Array.isArray(rawList) ? rawList : []
-      const nextList =
+      const withSim =
         typeof window !== 'undefined' && isDiagnosticUiSimEnabled()
           ? [...getDiagnosticSimErPatients(), ...apiList]
           : apiList
+      const nextList = DEV_MOCK_ENABLED
+        ? [DEV_MOCK_PATIENT, ...withSim.filter((p) => p.visitId !== DEV_MOCK_PATIENT.visitId)]
+        : withSim
       const nextHash = JSON.stringify(nextList)
       if (lastPatientsHashRef.current !== nextHash) {
         lastPatientsHashRef.current = nextHash
@@ -83,8 +234,18 @@ export function ERDoctorClinicShell() {
   useEffect(() => {
     readSimulationFlagFromUrl()
     void fetchErPatients()
-    const id = window.setInterval(() => void fetchErPatients(), 10000)
-    return () => window.clearInterval(id)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchErPatients()
+    }
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void fetchErPatients()
+    }, 15000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [fetchErPatients])
   const unreadResultsCount = new Set(
     erPatients
@@ -138,6 +299,7 @@ export function ERDoctorClinicShell() {
             loading={erLoading}
             error={erError}
             fetchPatients={fetchErPatients}
+            onSwitchToResultsTab={() => setTab('results')}
             heading={tab === 'active' ? 'ER Doctor Clinic — Active Queue' : 'ER Doctor Clinic — Results Arrived'}
             subheading={
               tab === 'active'
@@ -157,6 +319,7 @@ function ERClinicBoard({
   loading,
   error,
   fetchPatients,
+  onSwitchToResultsTab,
   heading,
   subheading,
   patientFilter,
@@ -165,15 +328,23 @@ function ERClinicBoard({
   loading: boolean
   error: string | null
   fetchPatients: () => void | Promise<void>
+  onSwitchToResultsTab?: () => void
   heading?: string
   subheading?: string
   patientFilter?: (p: ERPatient) => boolean
 }) {
   const { user } = useAuth()
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null)
+  const [toast, setToast] = useState<{
+    message: string
+    type: 'success' | 'alert'
+    onClick?: () => void
+    hint?: string
+  } | null>(null)
+  const [livePulseVisitIds, setLivePulseVisitIds] = useState<Set<string>>(() => new Set())
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedBedNumber, setSelectedBedNumber] = useState<number | null>(null)
   const [resultCard, setResultCard] = useState<{ type: ResultCardType; patient: ERPatient } | null>(null)
+  const [attachmentOverlayUrl, setAttachmentOverlayUrl] = useState<string | null>(null)
   const [requestModal, setRequestModal] = useState<{
     visitId: string
     patientId: string
@@ -182,34 +353,190 @@ function ERClinicBoard({
     department: 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
   } | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
-  const prevUnreviewedRef = useRef<Set<string>>(new Set())
-
-  useEffect(() => {
-    const prev = prevUnreviewedRef.current
-    const next = new Set<string>()
-    patients.forEach((p) => {
-      const bed = p.bedNumber ?? 0
-      if (p.labUnreviewed) next.add(`Bed ${bed} - Lab`)
-      if (p.radiologyUnreviewed) next.add(`Bed ${bed} - X-Ray`)
-      if (p.sonarUnreviewed) next.add(`Bed ${bed} - Sonar`)
-      if (p.ecgUnreviewed) next.add(`Bed ${bed} - ECG`)
-    })
-    const newKeys = Array.from(next).filter((k) => !prev.has(k))
-    if (newKeys.length > 0) {
-      const message =
-        newKeys.length === 1
-          ? `New Result: ${newKeys[0]} Ready`
-          : `New Results: ${newKeys.slice(0, 3).join('; ')}${newKeys.length > 3 ? ` +${newKeys.length - 3} more` : ''}`
-      setToast({ message, type: 'success' })
-      setTimeout(() => setToast(null), 5000)
-    }
-    prevUnreviewedRef.current = next
-  }, [patients])
+  const [attachmentPreviewFailed, setAttachmentPreviewFailed] = useState(false)
+  const seenTaskIdsRef = useRef<Set<string>>(new Set())
+  const sinceRef = useRef<string>(new Date(Date.now() - 5000).toISOString())
+  const pendingOpenRef = useRef<{ visitId: string; type: ResultCardType } | null>(null)
+  const liveToastGenRef = useRef(0)
 
   const showToast = (message: string, type: 'success' | 'alert') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 4000)
   }
+
+  const markResultReviewed = async (
+    visitId: string,
+    type: ResultCardType,
+    options?: { skipRefresh?: boolean }
+  ) => {
+    if (isSimVisitId(visitId)) {
+      dismissSimDoctorAlerts(visitId, type)
+      if (!options?.skipRefresh) void fetchPatients()
+      return
+    }
+    try {
+      await fetch('/api/emergency/doctor/result-reviewed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitId, department: type }),
+      })
+      if (!options?.skipRefresh) void fetchPatients()
+    } catch (_) {}
+  }
+
+  const openResultModal = async (type: ResultCardType, patient: ERPatient) => {
+    const ready =
+      (type === 'Lab' && patient.labReady) ||
+      (type === 'Radiology' && patient.radiologyReady) ||
+      (type === 'Sonar' && patient.sonarReady) ||
+      (type === 'ECG' && patient.ecgReady)
+    if (!ready) return
+
+    const hasInlineDiagnostic =
+      (type === 'Lab' && patient.labDiagnostic) ||
+      (type === 'Radiology' && patient.radiologyDiagnostic) ||
+      (type === 'Sonar' && patient.sonarDiagnostic) ||
+      (type === 'ECG' && patient.ecgDiagnostic)
+
+    let enrichedPatient = patient
+    if (!hasInlineDiagnostic) {
+      try {
+        const res = await fetch(`/api/visits/${encodeURIComponent(patient.visitId)}`)
+        if (res.ok) {
+          const payload = (await res.json()) as { visit?: { notes?: string | null } }
+          const fromVisit = getLatestDiagnosticFromNotes(payload.visit?.notes, type)
+          if (fromVisit) {
+            enrichedPatient = {
+              ...patient,
+              labDiagnostic: type === 'Lab' ? fromVisit : patient.labDiagnostic,
+              radiologyDiagnostic: type === 'Radiology' ? fromVisit : patient.radiologyDiagnostic,
+              sonarDiagnostic: type === 'Sonar' ? fromVisit : patient.sonarDiagnostic,
+              ecgDiagnostic: type === 'ECG' ? fromVisit : patient.ecgDiagnostic,
+            }
+          }
+        }
+      } catch {
+        // Keep existing card behavior even if fallback fetch fails.
+      }
+    }
+
+    void markResultReviewed(patient.visitId, type)
+    setResultCard({ type, patient: enrichedPatient })
+  }
+
+  const openResultModalRef = useRef(openResultModal)
+  openResultModalRef.current = openResultModal
+
+  const handleLiveResultReady = useCallback(
+    (ev: {
+      taskId: string
+      visitId: string
+      patientName: string
+      testType: string
+      resultCardType: ResultCardType
+      releasedAt?: string
+    }) => {
+      if (seenTaskIdsRef.current.has(ev.taskId)) return
+      seenTaskIdsRef.current.add(ev.taskId)
+      playErResultReadyChime()
+      setLivePulseVisitIds((prev) => new Set(prev).add(ev.visitId))
+      window.setTimeout(() => {
+        setLivePulseVisitIds((prev) => {
+          const n = new Set(prev)
+          n.delete(ev.visitId)
+          return n
+        })
+      }, 120_000)
+      const g = ++liveToastGenRef.current
+      setToast({
+        message: `New Result: ${ev.patientName} — ${ev.testType}`,
+        type: 'success',
+        hint: 'Tap to open results',
+        onClick: () => {
+          liveToastGenRef.current += 1
+          setToast(null)
+          onSwitchToResultsTab?.()
+          pendingOpenRef.current = { visitId: ev.visitId, type: ev.resultCardType }
+          void fetchPatients()
+        },
+      })
+      window.setTimeout(() => {
+        setToast((t) => (liveToastGenRef.current === g ? null : t))
+      }, 10_000)
+    },
+    [fetchPatients, onSwitchToResultsTab]
+  )
+
+  useEffect(() => {
+    const pending = pendingOpenRef.current
+    if (!pending) return
+    const pat = patients.find((p) => p.visitId === pending.visitId)
+    if (!pat) return
+    const ok =
+      (pending.type === 'Lab' && pat.labReady && pat.labDiagnostic) ||
+      (pending.type === 'Radiology' && pat.radiologyReady && pat.radiologyDiagnostic) ||
+      (pending.type === 'Sonar' && pat.sonarReady && pat.sonarDiagnostic) ||
+      (pending.type === 'ECG' && pat.ecgReady && pat.ecgDiagnostic)
+    if (!ok) return
+    pendingOpenRef.current = null
+    void openResultModalRef.current(pending.type, pat)
+  }, [patients])
+
+  useEffect(() => {
+    setAttachmentPreviewFailed(false)
+    setAttachmentOverlayUrl(null)
+  }, [resultCard?.type, resultCard?.patient.visitId])
+
+  useEffect(() => {
+    return subscribeResultReady((data) => {
+      handleLiveResultReady({
+        taskId: data.taskId,
+        visitId: data.visitId,
+        patientName: data.patientName,
+        testType: data.testType,
+        resultCardType: data.resultCardType,
+        releasedAt: data.at,
+      })
+    })
+  }, [handleLiveResultReady])
+
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await fetch(
+          `/api/emergency/result-notifications?since=${encodeURIComponent(sinceRef.current)}`
+        )
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as {
+          events?: Array<{
+            taskId: string
+            visitId: string
+            patientName: string
+            testType: string
+            resultCardType: ResultCardType
+            releasedAt: string
+          }>
+        }
+        const events = data.events ?? []
+        let maxTs = sinceRef.current
+        for (const ev of events) {
+          if (ev.releasedAt > maxTs) maxTs = ev.releasedAt
+          handleLiveResultReady(ev)
+        }
+        if (events.length > 0) sinceRef.current = maxTs
+      } catch {
+        /* ignore */
+      }
+    }
+    const id = window.setInterval(() => void tick(), 15000)
+    void tick()
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [handleLiveResultReady])
 
   const bedMap = new Map<number, ERPatient>()
   patients.forEach((p) => {
@@ -234,26 +561,6 @@ function ERClinicBoard({
     setSelectedBedNumber(null)
   }
 
-  const markResultReviewed = async (
-    visitId: string,
-    type: ResultCardType,
-    options?: { skipRefresh?: boolean }
-  ) => {
-    if (isSimVisitId(visitId)) {
-      dismissSimDoctorAlerts(visitId, type)
-      if (!options?.skipRefresh) void fetchPatients()
-      return
-    }
-    try {
-      await fetch('/api/emergency/doctor/result-reviewed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visitId, department: type }),
-      })
-      if (!options?.skipRefresh) void fetchPatients()
-    } catch (_) {}
-  }
-
   const clearUnreadResultsForPatient = async (p: ERPatient) => {
     const deps: ResultCardType[] = []
     if (p.labUnreviewed) deps.push('Lab')
@@ -265,42 +572,36 @@ function ERClinicBoard({
     void fetchPatients()
   }
 
-  const openResultModal = (type: ResultCardType, patient: ERPatient) => {
-    if (type === 'Lab' && !(patient.labReady && patient.labDiagnostic)) return
-    if (type === 'Radiology' && !(patient.radiologyReady && patient.radiologyDiagnostic)) return
-    if (type === 'Sonar' && !(patient.sonarReady && patient.sonarDiagnostic)) return
-    if (type === 'ECG' && !(patient.ecgReady && patient.ecgDiagnostic)) return
-    void markResultReviewed(patient.visitId, type)
-    setResultCard({ type, patient })
-  }
-
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/60 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
-            <LayoutGrid className="h-7 w-7 text-cyan-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100">{heading ?? 'ER Doctor Clinic'}</h1>
-            <p className="text-sm text-slate-400">
-              {subheading ?? 'Vitals from Vitals Station; diagnostics and tasks — click a bed'}
-            </p>
-          </div>
+      {toast ? (
+        <div className="fixed top-6 right-6 z-[100] max-w-sm animate-in fade-in slide-in-from-top-2 duration-300">
+          {toast.onClick ? (
+            <button
+              type="button"
+              onClick={() => toast.onClick?.()}
+              className={`w-full rounded-xl border px-4 py-3 text-left shadow-xl backdrop-blur-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-violet-400/60 ${
+                toast.type === 'success'
+                  ? 'border-emerald-400/40 bg-slate-900/95 text-emerald-100'
+                  : 'border-amber-400/40 bg-slate-900/95 text-amber-100'
+              }`}
+            >
+              <p className="text-sm font-semibold leading-snug">{toast.message}</p>
+              {toast.hint ? <p className="mt-1 text-xs text-slate-400">{toast.hint}</p> : null}
+            </button>
+          ) : (
+            <div
+              className={`rounded-xl border px-5 py-3 shadow-lg ${
+                toast.type === 'success'
+                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                  : 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+              }`}
+            >
+              {toast.message}
+            </div>
+          )}
         </div>
-      </div>
-
-      {toast && (
-        <div
-          className={`fixed top-6 right-6 z-[100] px-5 py-3 rounded-xl border shadow-lg ${
-            toast.type === 'success'
-              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-              : 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
+      ) : null}
 
       {(error || localError) && (
         <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-400">
@@ -329,20 +630,11 @@ function ERClinicBoard({
                   key={bedNum}
                   bedNum={bedNum}
                   patient={patient}
+                  liveResultReadyHighlight={Boolean(patient && livePulseVisitIds.has(patient.visitId))}
                   onOpenDrawer={openDrawer}
-                  onQuickRequest={(e, p, department) => {
-                    e.stopPropagation()
-                    setRequestModal({
-                      visitId: p.visitId,
-                      patientId: p.patientId,
-                      patientName: p.name,
-                      bedNumber: p.bedNumber ?? bedNum,
-                      department,
-                    })
-                  }}
                   onResultClick={(e, type, p) => {
                     e.stopPropagation()
-                    openResultModal(type, p)
+                    void openResultModal(type, p)
                   }}
                 />
               )
@@ -366,7 +658,7 @@ function ERClinicBoard({
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" aria-hidden onClick={() => setResultCard(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-700 p-4">
                 <h3 className="text-lg font-semibold text-slate-100">
                   {resultCard.type === 'Lab'
@@ -382,70 +674,130 @@ function ERClinicBoard({
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="space-y-3 p-4">
-                <p className="text-sm text-slate-400">
+              <div className="overflow-y-auto p-6">
+                <p className="mb-4 text-sm text-slate-400">
                   Bed {resultCard.patient.bedNumber} — {resultCard.patient.name}
                 </p>
-                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
-                  <p className="mb-1 text-sm font-medium text-slate-300">Summary</p>
-                  <pre className="whitespace-pre-wrap text-sm text-slate-200">
-                    {(resultCard.type === 'Lab'
+                {(() => {
+                  const activeDiagnostic =
+                    resultCard.type === 'Lab'
                       ? resultCard.patient.labDiagnostic
                       : resultCard.type === 'Radiology'
                         ? resultCard.patient.radiologyDiagnostic
                         : resultCard.type === 'Sonar'
                           ? resultCard.patient.sonarDiagnostic
                           : resultCard.patient.ecgDiagnostic
-                    )?.summary || '—'}
-                  </pre>
-                </div>
-                {resultCard.type !== 'Lab' &&
-                  (resultCard.type === 'Radiology'
-                    ? resultCard.patient.radiologyDiagnostic?.technicianNotes
-                    : resultCard.type === 'Sonar'
-                      ? resultCard.patient.sonarDiagnostic?.technicianNotes
-                      : resultCard.patient.ecgDiagnostic?.technicianNotes) && (
-                    <div className="rounded-lg border border-sky-500/25 bg-slate-800/50 p-3">
-                      <p className="mb-1 text-sm font-medium text-sky-300">Technician notes</p>
-                      <pre className="whitespace-pre-wrap text-sm text-slate-200">
-                        {resultCard.type === 'Radiology'
-                          ? resultCard.patient.radiologyDiagnostic?.technicianNotes
-                          : resultCard.type === 'Sonar'
-                            ? resultCard.patient.sonarDiagnostic?.technicianNotes
-                            : resultCard.patient.ecgDiagnostic?.technicianNotes}
-                      </pre>
-                    </div>
-                  )}
-                {(resultCard.type === 'Lab'
-                  ? resultCard.patient.labDiagnostic
-                  : resultCard.type === 'Radiology'
-                    ? resultCard.patient.radiologyDiagnostic
-                    : resultCard.type === 'Sonar'
-                      ? resultCard.patient.sonarDiagnostic
-                      : resultCard.patient.ecgDiagnostic
-                )?.attachmentPath && (
-                  <a
-                    href={
-                      (resultCard.type === 'Lab'
-                        ? resultCard.patient.labDiagnostic
-                        : resultCard.type === 'Radiology'
-                          ? resultCard.patient.radiologyDiagnostic
-                          : resultCard.type === 'Sonar'
-                            ? resultCard.patient.sonarDiagnostic
-                            : resultCard.patient.ecgDiagnostic)!.attachmentPath
+                  const headerLabel =
+                    resultCard.type === 'Lab'
+                      ? 'Lab Result'
+                      : resultCard.type === 'Radiology'
+                        ? 'Radiology Report'
+                        : resultCard.type === 'Sonar'
+                          ? 'Sonar Report'
+                          : 'ECG Report'
+                  const attachmentUrl = resolveAttachmentUrl(activeDiagnostic?.attachmentPath)
+                  const openFullAttachment = () => {
+                    if (!attachmentUrl || !isNavigableAttachmentUrl(attachmentUrl)) return
+                    const popup = window.open(attachmentUrl, '_blank', 'noopener,noreferrer')
+                    if (!popup) {
+                      setAttachmentOverlayUrl(attachmentUrl)
                     }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/20 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/30"
-                  >
-                    {resultCard.type === 'Lab' ? 'View Attachment' : 'View Original Image/Report'}
-                  </a>
-                )}
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <section className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                        <p className="mb-2 text-sm font-semibold text-slate-200">{headerLabel}</p>
+                        <pre className="whitespace-pre-wrap text-sm text-slate-200">{activeDiagnostic?.summary || '—'}</pre>
+                      </section>
+
+                      <section className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                        <p className="mb-2 text-sm font-semibold text-slate-200">Attachment</p>
+                        {!attachmentUrl ? (
+                          <p className="text-sm text-slate-500">No attachment uploaded.</p>
+                        ) : attachmentPreviewFailed ? (
+                          <a
+                            href={attachmentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/20 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/30"
+                          >
+                            Download Attachment
+                          </a>
+                        ) : (
+                          <div className="space-y-3">
+                            <img
+                              src={attachmentUrl}
+                              alt={`${headerLabel} attachment`}
+                              loading="lazy"
+                              className="h-56 w-full rounded-lg border border-slate-700 object-cover bg-slate-900"
+                              onError={() => setAttachmentPreviewFailed(true)}
+                            />
+                            <button
+                              type="button"
+                              onClick={openFullAttachment}
+                              className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/20 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/30"
+                            >
+                              View Full Attachment
+                            </button>
+                          </div>
+                        )}
+                      </section>
+
+                      {resultCard.type !== 'Lab' &&
+                      (resultCard.type === 'Radiology'
+                        ? resultCard.patient.radiologyDiagnostic?.technicianNotes
+                        : resultCard.type === 'Sonar'
+                          ? resultCard.patient.sonarDiagnostic?.technicianNotes
+                          : resultCard.patient.ecgDiagnostic?.technicianNotes) ? (
+                        <section className="rounded-lg border border-sky-500/25 bg-slate-800/40 p-4 lg:col-span-2">
+                          <p className="mb-2 text-sm font-semibold text-sky-300">Technician Notes</p>
+                          <pre className="whitespace-pre-wrap text-sm text-slate-200">
+                            {resultCard.type === 'Radiology'
+                              ? resultCard.patient.radiologyDiagnostic?.technicianNotes
+                              : resultCard.type === 'Sonar'
+                                ? resultCard.patient.sonarDiagnostic?.technicianNotes
+                                : resultCard.patient.ecgDiagnostic?.technicianNotes}
+                          </pre>
+                        </section>
+                      ) : null}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>
         </>
       )}
+      {attachmentOverlayUrl ? (
+        <>
+          <div
+            className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm"
+            aria-hidden
+            onClick={() => setAttachmentOverlayUrl(null)}
+          />
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            <div
+              className="relative w-full max-w-5xl rounded-xl border border-slate-700 bg-slate-950 p-3 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setAttachmentOverlayUrl(null)}
+                className="absolute right-3 top-3 rounded-md bg-slate-900/80 p-2 text-slate-300 hover:bg-slate-800"
+                aria-label="Close attachment preview"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <img
+                src={attachmentOverlayUrl}
+                alt="Full attachment preview"
+                className="max-h-[82vh] w-full rounded-lg object-contain"
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {requestModal && (
         <RequestDiagnosticModal
@@ -587,49 +939,82 @@ interface ERDoctorDrawerProps {
 }
 
 type DiagnosticDept = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
-type ActivityEntry = {
+type DiagnosticDraft = {
   id: string
-  action: string
-  details?: string | null
-  actorName?: string | null
-  createdAt: string
+  department: DiagnosticDept
+  testName: string
+  note: string
+}
+type MedicationDraft = {
+  id: string
+  drugName: string
+  dose: string
+  frequency: string
+  duration: string
+  quantity: number
+}
+
+type AssignTaskDraft = {
+  id: string
+  preset: 'Injection' | 'IV' | 'Dressing' | 'Other'
+  instruction: string
+}
+
+const TASK_PRESET_CONFIG: Record<
+  AssignTaskDraft['preset'],
+  { serviceCode: string | null; titlePrefix: string; department: string }
+> = {
+  Injection: { serviceCode: 'NURSING_IV_DRIP', titlePrefix: 'Injection', department: 'NURSING' },
+  IV: { serviceCode: 'NURSING_IV_DRIP', titlePrefix: 'IV / fluids', department: 'NURSING' },
+  Dressing: { serviceCode: 'NURSING_DRESSING', titlePrefix: 'Dressing / wound care', department: 'NURSING' },
+  Other: { serviceCode: null, titlePrefix: 'Other nurse task', department: 'NURSING' },
+}
+
+function makeTaskDraft(): AssignTaskDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    preset: 'Injection',
+    instruction: '',
+  }
+}
+
+function makeDiagnosticDraft(): DiagnosticDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    department: 'Lab',
+    testName: '',
+    note: '',
+  }
+}
+
+function makeMedicationDraft(): MedicationDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    drugName: '',
+    dose: '',
+    frequency: '',
+    duration: '',
+    quantity: 1,
+  }
 }
 
 function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setError }: ERDoctorDrawerProps) {
-  const [medications, setMedications] = useState(patient.doctorMedications ?? '')
-  const [labTests, setLabTests] = useState(patient.doctorLabTests ?? '')
-  const [diagnosticDept, setDiagnosticDept] = useState<DiagnosticDept>('Lab')
+  const [diagnosticItems, setDiagnosticItems] = useState<DiagnosticDraft[]>([makeDiagnosticDraft()])
+  const [medicationItems, setMedicationItems] = useState<MedicationDraft[]>([makeMedicationDraft()])
   const [saving, setSaving] = useState(false)
   const [sendingPharmacy, setSendingPharmacy] = useState(false)
   const [sendingLab, setSendingLab] = useState(false)
   const [discharging, setDischarging] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
-  const [taskPreset, setTaskPreset] = useState('Injection')
-  const [taskDetail, setTaskDetail] = useState('')
+  const [assignTasks, setAssignTasks] = useState<AssignTaskDraft[]>([makeTaskDraft()])
   const [assignSending, setAssignSending] = useState(false)
-  const [activityHistory, setActivityHistory] = useState<ActivityEntry[]>([])
+  const hasPendingLabResults = Boolean(
+    patient.erOrders?.some((o) => ['LAB', 'LAB_REQUESTED'].includes(o.type)) && !patient.labReady
+  )
 
   useEffect(() => {
-    setMedications(patient.doctorMedications ?? '')
-    setLabTests(patient.doctorLabTests ?? '')
-  }, [patient.visitId])
-
-  useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/emergency/activity?visitId=${encodeURIComponent(patient.visitId)}`)
-        if (!res.ok) return
-        const data = (await res.json()) as ActivityEntry[]
-        if (mounted) setActivityHistory(Array.isArray(data) ? data : [])
-      } catch (_) {}
-    }
-    void load()
-    const id = window.setInterval(() => void load(), 10000)
-    return () => {
-      mounted = false
-      window.clearInterval(id)
-    }
+    setDiagnosticItems([makeDiagnosticDraft()])
+    setMedicationItems([makeMedicationDraft()])
   }, [patient.visitId])
 
   const saveOrders = async () => {
@@ -641,8 +1026,16 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           visitId: patient.visitId,
-          medications: medications.trim() || undefined,
-          labTests: labTests.trim() || undefined,
+          medications:
+            medicationItems
+              .map((item) => `${item.drugName.trim()} ${item.dose.trim()} - ${item.frequency.trim()} ${item.duration.trim()}`.trim())
+              .filter(Boolean)
+              .join('\n') || undefined,
+          labTests:
+            diagnosticItems
+              .map((item) => `${item.department}: ${item.testName.trim()} ${item.note.trim()}`.trim())
+              .filter(Boolean)
+              .join('\n') || undefined,
         }),
       })
       if (!res.ok) {
@@ -660,25 +1053,22 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
   }
 
   const sendToPharmacy = async () => {
-    const medText = medications.trim()
-    if (!medText) {
+    const payloadItems = medicationItems
+      .map((item) => ({
+        medicineName: item.drugName.trim(),
+        dosage: item.dose.trim(),
+        frequency: item.frequency.trim(),
+        duration: item.duration.trim(),
+        quantity: Math.max(1, Number(item.quantity) || 1),
+      }))
+      .filter((item) => item.medicineName.length > 0)
+    if (payloadItems.length === 0) {
       setError('Enter medications first.')
       return
     }
     setError(null)
     setSendingPharmacy(true)
     try {
-      const prescriptionItems = medText.split('\n').filter((l) => l.trim()).map((line) => {
-        const parts = line.split(' - ')
-        const medicinePart = parts[0] || line
-        const frequency = parts[1] || 'As prescribed'
-        const match = medicinePart.match(/^(.+?)\s+(\d+.*?)$/)
-        return {
-          medicineName: match ? match[1].trim() : medicinePart.trim(),
-          dosage: match ? match[2].trim() : 'As prescribed',
-          frequency: frequency.trim(),
-        }
-      })
       const res = await fetch('/api/doctor/visit/send-to-pharmacy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -686,7 +1076,7 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
           visitId: patient.visitId,
           patientId: patient.patientId,
           doctorId,
-          prescriptionItems,
+          prescriptionItems: payloadItems,
           diagnosis: patient.chiefComplaint || 'ER',
         }),
       })
@@ -700,7 +1090,7 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
         body: JSON.stringify({ visitId: patient.visitId, type: 'PHARMACY_SENT', status: 'DONE' }),
       }).catch(() => {})
       showToast('Sent to Pharmacy & Finance. Nurse task updated.', 'success')
-      setMedications('')
+      setMedicationItems([makeMedicationDraft()])
       onSaved()
     } catch (e: unknown) {
       const err = e as Error
@@ -711,8 +1101,15 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
   }
 
   const requestLab = async () => {
-    const content = labTests.trim()
-    if (!content) {
+    const payloadItems = diagnosticItems
+      .map((item) => ({
+        department: item.department,
+        testName: item.testName.trim(),
+        note: item.note.trim(),
+      }))
+      .filter((item) => item.testName.length > 0)
+
+    if (payloadItems.length === 0) {
       setError('Enter tests / impression first.')
       return
     }
@@ -722,22 +1119,14 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
       const res = await fetch('/api/emergency/doctor/lab-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visitId: patient.visitId, content, department: diagnosticDept }),
+        body: JSON.stringify({ visitId: patient.visitId, items: payloadItems }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || 'Failed to request')
       }
-      const deptLabel =
-        diagnosticDept === 'Lab'
-          ? 'Lab'
-          : diagnosticDept === 'Radiology'
-            ? 'X-Ray'
-            : diagnosticDept === 'Sonar'
-              ? 'Sonar'
-              : 'ECG'
-      showToast(`${deptLabel} request sent.`, 'success')
-      setLabTests('')
+      showToast(`${payloadItems.length} diagnostic request(s) sent.`, 'success')
+      setDiagnosticItems([makeDiagnosticDraft()])
       onSaved()
     } catch (e: unknown) {
       const err = e as Error
@@ -784,33 +1173,53 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
   }
 
   const submitAssignTask = async () => {
-    const detail = taskDetail.trim()
-    if (!detail) {
-      setError('Enter task instructions for the nurse.')
+    const payloadTasks = assignTasks
+      .map((row) => ({ ...row, instruction: row.instruction.trim() }))
+      .filter((row) => row.instruction.length > 0)
+
+    if (payloadTasks.length === 0) {
+      setError('Enter at least one task instruction for the nurse.')
       return
     }
     setAssignSending(true)
     setError(null)
     try {
-      const res = await fetch('/api/emergency/doctor/append-task', {
+      const requestBody = {
+        visitId: patient.visitId,
+        tasks: payloadTasks.map((row) => {
+          const config = TASK_PRESET_CONFIG[row.preset]
+          return {
+            type: 'NURSE_TASK',
+            title: `${config.titlePrefix}: ${row.instruction}`,
+            category: 'NURSING',
+            billDepartment: config.department,
+            ...(config.serviceCode ? { serviceCode: config.serviceCode } : {}),
+          }
+        }),
+      }
+      const res = await fetch('/api/er/tasks/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitId: patient.visitId,
-          type: 'NURSE_TASK',
-          content: `${taskPreset}: ${detail}`,
-          assigneeUserId: 'POOL',
-        }),
+        body: JSON.stringify(requestBody),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
+        console.error('Assign nurse task failed:', {
+          status: res.status,
+          statusText: res.statusText,
+          response: d,
+          payload: requestBody,
+        })
         throw new Error((d as { error?: string }).error || 'Failed to assign task')
       }
-      showToast('Task sent to floor nurses.', 'success')
+      const data = await res.json().catch(() => ({} as { tasks?: unknown[] }))
+      const count = Array.isArray((data as { tasks?: unknown[] }).tasks) ? (data as { tasks: unknown[] }).tasks.length : payloadTasks.length
+      showToast(`${count} task(s) sent to floor nurses and added to billing.`, 'success')
       setAssignOpen(false)
-      setTaskDetail('')
+      setAssignTasks([makeTaskDraft()])
       onSaved()
     } catch (e: unknown) {
+      console.error('submitAssignTask error:', e)
       setError((e as Error).message || 'Failed')
     } finally {
       setAssignSending(false)
@@ -832,26 +1241,60 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
               onClick={(e) => e.stopPropagation()}
             >
               <h4 className="text-lg font-semibold text-slate-100">Assign nurse task</h4>
-              <p className="mt-1 text-xs text-slate-500">General ER nurse pool</p>
-              <label className="mt-4 block text-xs text-slate-400">Type</label>
-              <select
-                value={taskPreset}
-                onChange={(e) => setTaskPreset(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
-              >
-                <option value="Injection">Injection</option>
-                <option value="IV">IV / fluids</option>
-                <option value="Dressing">Dressing / wound care</option>
-                <option value="Other">Other</option>
-              </select>
-              <label className="mt-3 block text-xs text-slate-400">Instructions</label>
-              <textarea
-                value={taskDetail}
-                onChange={(e) => setTaskDetail(e.target.value)}
-                rows={3}
-                placeholder="e.g. Ceftriaxone 1g IM left deltoid"
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500"
-              />
+              <p className="mt-1 text-xs text-slate-500">General ER nurse pool (multi-task assign)</p>
+              <div className="mt-4 space-y-3">
+                {assignTasks.map((row, idx) => (
+                  <div key={row.id} className="rounded-lg border border-slate-700/70 bg-slate-800/35 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-300">Task {idx + 1}</span>
+                      {assignTasks.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setAssignTasks((prev) => prev.filter((x) => x.id !== row.id))}
+                          className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 hover:bg-rose-500/20"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <label className="block text-xs text-slate-400">Type</label>
+                    <select
+                      value={row.preset}
+                      onChange={(e) =>
+                        setAssignTasks((prev) =>
+                          prev.map((x) =>
+                            x.id === row.id ? { ...x, preset: e.target.value as AssignTaskDraft['preset'] } : x
+                          )
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                    >
+                      <option value="Injection">Injection</option>
+                      <option value="IV">IV / fluids</option>
+                      <option value="Dressing">Dressing / wound care</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <label className="mt-3 block text-xs text-slate-400">Instructions</label>
+                    <textarea
+                      value={row.instruction}
+                      onChange={(e) =>
+                        setAssignTasks((prev) => prev.map((x) => (x.id === row.id ? { ...x, instruction: e.target.value } : x)))
+                      }
+                      rows={3}
+                      placeholder="e.g. Ceftriaxone 1g IM left deltoid"
+                      className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  disabled={assignSending}
+                  onClick={() => setAssignTasks((prev) => [...prev, makeTaskDraft()])}
+                  className="w-full rounded-lg border border-cyan-500/50 bg-cyan-500/10 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20"
+                >
+                  + Add Task
+                </button>
+              </div>
               <div className="mt-4 flex gap-2">
                 <button
                   type="button"
@@ -863,7 +1306,7 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
                 </button>
                 <button
                   type="button"
-                  disabled={assignSending || !taskDetail.trim()}
+                  disabled={assignSending || !assignTasks.some((t) => t.instruction.trim())}
                   onClick={() => void submitAssignTask()}
                   className="flex-1 rounded-lg border border-violet-500/50 bg-violet-500/20 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-500/30 disabled:opacity-50"
                 >
@@ -934,7 +1377,10 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
             )}
             <button
               type="button"
-              onClick={() => setAssignOpen(true)}
+              onClick={() => {
+                setAssignTasks([makeTaskDraft()])
+                setAssignOpen(true)
+              }}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-violet-400/70 bg-violet-500/30 py-3.5 text-base font-bold text-violet-100 shadow-[0_0_24px_rgba(168,85,247,0.22)] hover:bg-violet-500/40"
             >
               <ListTodo className="h-5 w-5" />
@@ -945,70 +1391,75 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
             </p>
           </section>
 
-          <section className="space-y-2 rounded-xl border border-slate-700/60 bg-slate-800/20 p-3">
-            <h4 className="text-sm font-semibold text-slate-200">Bed Activity History</h4>
-            {activityHistory.length === 0 ? (
-              <p className="text-xs text-slate-500">No activity recorded yet.</p>
-            ) : (
-              <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
-                {activityHistory.map((entry) => {
-                  const at = new Date(entry.createdAt)
-                  const time = Number.isNaN(at.getTime())
-                    ? '—'
-                    : at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  const by = entry.actorName ? ` by ${entry.actorName}` : ''
-                  return (
-                    <div key={entry.id} className="rounded-md border border-slate-700/60 bg-slate-900/40 px-2 py-1.5 text-xs">
-                      <p className="text-slate-200">
-                        <span className="font-semibold text-cyan-300">{time}</span> - {entry.action}
-                        {by}
-                      </p>
-                      {entry.details ? <p className="mt-0.5 text-[10px] text-slate-500">{entry.details}</p> : null}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
           {/* Group 1: Diagnostics */}
           <section className="space-y-3 rounded-xl border border-slate-700/70 bg-slate-800/25 p-3">
             <h4 className="text-sm font-semibold text-cyan-200">Diagnostics</h4>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { key: 'Lab', label: 'Lab' },
-                { key: 'Radiology', label: 'X-Ray' },
-                { key: 'Sonar', label: 'Sonar' },
-                { key: 'ECG', label: 'ECG' },
-              ].map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setDiagnosticDept(opt.key as DiagnosticDept)}
-                  className={`rounded-lg border px-2 py-2 text-sm font-semibold transition ${
-                    diagnosticDept === opt.key
-                      ? 'border-cyan-500/60 bg-cyan-500/20 text-cyan-200'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Diagnostic Details</label>
-              <textarea
-                value={labTests}
-                onChange={(e) => setLabTests(e.target.value)}
-                placeholder="e.g. CBC, X-Ray Chest"
-                rows={2}
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
-              />
-            </div>
+            {diagnosticItems.map((row, idx) => (
+              <div key={row.id} className="rounded-lg border border-slate-700/70 bg-slate-900/40 p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-300">Diagnostic {idx + 1}</p>
+                  {diagnosticItems.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setDiagnosticItems((prev) => prev.filter((item) => item.id !== row.id))}
+                      className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 hover:bg-rose-500/20"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    value={row.department}
+                    onChange={(e) =>
+                      setDiagnosticItems((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id ? { ...item, department: e.target.value as DiagnosticDept } : item
+                        )
+                      )
+                    }
+                    className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 text-sm"
+                  >
+                    <option value="Lab">Lab</option>
+                    <option value="Radiology">X-Ray</option>
+                    <option value="Sonar">Sonar</option>
+                    <option value="ECG">ECG</option>
+                  </select>
+                  <input
+                    value={row.testName}
+                    onChange={(e) =>
+                      setDiagnosticItems((prev) =>
+                        prev.map((item) => (item.id === row.id ? { ...item, testName: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Test name"
+                    className="col-span-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                  />
+                </div>
+                <input
+                  value={row.note}
+                  onChange={(e) =>
+                    setDiagnosticItems((prev) =>
+                      prev.map((item) => (item.id === row.id ? { ...item, note: e.target.value } : item))
+                    )
+                  }
+                  placeholder="Note / priority (e.g. urgent)"
+                  className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              disabled={sendingLab}
+              onClick={() => setDiagnosticItems((prev) => [...prev, makeDiagnosticDraft()])}
+              className="w-full rounded-lg border border-cyan-500/50 bg-cyan-500/10 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20"
+            >
+              + Add Diagnostic
+            </button>
             <button
               type="button"
               onClick={requestLab}
-              disabled={sendingLab || !labTests.trim()}
+              disabled={sendingLab || !diagnosticItems.some((item) => item.testName.trim())}
               className="w-full py-2.5 rounded-lg bg-cyan-500/20 border border-cyan-500/50 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <FlaskConical className="h-4 w-4" />
@@ -1020,21 +1471,93 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
           {/* Group 2: Pharmacy Orders */}
           <section className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
             <h4 className="text-sm font-semibold text-amber-200">Pharmacy Orders</h4>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Medication List (for Pharmacy)</label>
-              <textarea
-                value={medications}
-                onChange={(e) => setMedications(e.target.value)}
-                placeholder="e.g. Paracetamol 500mg TDS"
-                rows={3}
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
-              />
-            </div>
+            {medicationItems.map((row, idx) => (
+              <div key={row.id} className="rounded-lg border border-slate-700/70 bg-slate-900/40 p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-300">Medication {idx + 1}</p>
+                  {medicationItems.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setMedicationItems((prev) => prev.filter((item) => item.id !== row.id))}
+                      className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 hover:bg-rose-500/20"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <input
+                  value={row.drugName}
+                  onChange={(e) =>
+                    setMedicationItems((prev) =>
+                      prev.map((item) => (item.id === row.id ? { ...item, drugName: e.target.value } : item))
+                    )
+                  }
+                  placeholder="Drug name"
+                  className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                />
+                <div className="grid grid-cols-4 gap-2">
+                  <input
+                    value={row.dose}
+                    onChange={(e) =>
+                      setMedicationItems((prev) =>
+                        prev.map((item) => (item.id === row.id ? { ...item, dose: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Dose"
+                    className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                  />
+                  <input
+                    value={row.frequency}
+                    onChange={(e) =>
+                      setMedicationItems((prev) =>
+                        prev.map((item) => (item.id === row.id ? { ...item, frequency: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Frequency"
+                    className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                  />
+                  <input
+                    value={row.duration}
+                    onChange={(e) =>
+                      setMedicationItems((prev) =>
+                        prev.map((item) => (item.id === row.id ? { ...item, duration: e.target.value } : item))
+                      )
+                    }
+                    placeholder="Duration"
+                    className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={row.quantity}
+                    onChange={(e) =>
+                      setMedicationItems((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, quantity: Math.max(1, Number(e.target.value) || 1) }
+                            : item
+                        )
+                      )
+                    }
+                    placeholder="Qty"
+                    className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-slate-100 placeholder-slate-500 text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              disabled={sendingPharmacy}
+              onClick={() => setMedicationItems((prev) => [...prev, makeMedicationDraft()])}
+              className="w-full rounded-lg border border-amber-500/50 bg-amber-500/10 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
+            >
+              + Add Medication
+            </button>
             <div className="space-y-1">
               <button
                 type="button"
                 onClick={sendToPharmacy}
-                disabled={sendingPharmacy || !medications.trim()}
+                disabled={sendingPharmacy || !medicationItems.some((item) => item.drugName.trim())}
                 className="w-full py-2.5 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-300 text-sm font-medium hover:bg-amber-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Pill className="h-4 w-4" />
@@ -1132,7 +1655,14 @@ function ERDoctorDrawer({ patient, doctorId, onClose, onSaved, showToast, setErr
               {discharging ? 'Sending...' : patient.billingStatus === 'waiting_for_payment' ? 'In Pending Payment' : 'Ready for Discharge'}
             </button>
             {patient.hasPendingDiagnostics ? (
-              <p className="text-[10px] text-amber-400">Pending Lab / X-Ray / Sonar / ECG — complete or remove requests first.</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-amber-400">Pending Lab / X-Ray / Sonar / ECG — complete or remove requests first.</p>
+                {hasPendingLabResults ? (
+                  <p className="text-[10px] font-semibold text-rose-300">
+                    Lab safety warning: pending lab results must be reviewed before discharge.
+                  </p>
+                ) : null}
+              </div>
             ) : patient.billingStatus === 'waiting_for_payment' ? (
               <p className="text-[10px] text-emerald-400">Patient is in Accountant Pending list. Pay there to free the bed.</p>
             ) : (

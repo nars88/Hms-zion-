@@ -67,10 +67,26 @@ export async function POST(request: NextRequest) {
       const isER =
         visit.chiefComplaint?.toLowerCase().includes('emergency') ||
         visit.chiefComplaint?.toLowerCase().includes('er')
+      const notesRow = await prisma.visit.findUnique({
+        where: { id: visitId },
+        select: { notes: true },
+      })
+      let parsedNotes: Record<string, unknown> = {}
+      try {
+        if (notesRow?.notes) parsedNotes = JSON.parse(notesRow.notes) as Record<string, unknown>
+      } catch {
+        parsedNotes = {}
+      }
       await prisma.visit.update({
         where: { id: visitId },
         data: {
           status: isER ? VisitStatus.Discharged : VisitStatus.COMPLETED,
+          bedNumber: null,
+          notes: JSON.stringify({
+            ...parsedNotes,
+            bedExitState: 'AVAILABLE',
+            bedReleasedAt: new Date().toISOString(),
+          }),
           ...(isER && { dischargeDate: new Date() }),
           updatedAt: new Date(),
         },

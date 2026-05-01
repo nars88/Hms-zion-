@@ -67,8 +67,18 @@ export default function ERMobileTasksPage() {
 
   useEffect(() => {
     void fetchTasks()
-    const id = window.setInterval(() => void fetchTasks(), 10000)
-    return () => window.clearInterval(id)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchTasks()
+    }
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void fetchTasks()
+    }, 15000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [fetchTasks])
 
   return (
@@ -168,14 +178,19 @@ export default function ERMobileTasksPage() {
                           disabled={busyTaskKey === key}
                           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500/20 py-3.5 text-base font-bold text-emerald-200 ring-1 ring-emerald-500/50 active:scale-[0.99]"
                           onClick={async () => {
+                            if (!t.taskId) {
+                              setMsg('Task id missing. Refresh queue.')
+                              setTimeout(() => setMsg(null), 3000)
+                              return
+                            }
                             setBusyTaskKey(key)
                             setTasks((prev) => prev.filter((x) => !(x.visitId === t.visitId && x.at === t.at)))
                             setFinished((prev) => [{ ...t, status: 'DONE', completedAt: new Date().toISOString() }, ...prev].slice(0, 20))
                             try {
-                              const res = await fetch('/api/emergency/tasks/mark-done', {
-                                method: 'POST',
+                              const res = await fetch('/api/er/tasks/complete', {
+                                method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ visitId: t.visitId, at: t.at }),
+                                body: JSON.stringify({ taskId: t.taskId }),
                               })
                               if (res.ok) {
                                 setMsg('Marked done.')

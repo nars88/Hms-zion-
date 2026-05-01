@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useWaitingList } from '@/contexts/WaitingListContext'
 import { isERVisitId } from '@/lib/visitIdGenerator'
-import { useLanguage } from '@/contexts/LanguageContext'
+import { formatNumber } from '@/lib/locale'
 
 interface WaitingPatientsListProps {
   onSelectPatient: (patient: any) => void
@@ -106,7 +106,6 @@ const getPriorityColor = (priority: string) => {
 export default function WaitingPatientsList({ onSelectPatient, selectedPatientId }: WaitingPatientsListProps) {
   const { waitingPatients } = useWaitingList()
   const [patients, setPatients] = useState(mockPatients)
-  const { t, formatNumber } = useLanguage()
 
   // Merge waiting list patients with mock data
   useEffect(() => {
@@ -146,8 +145,8 @@ export default function WaitingPatientsList({ onSelectPatient, selectedPatientId
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-slate-800/50 flex-shrink-0">
-        <h2 className="text-base font-semibold text-primary mb-0.5">{t('patient.waiting')}</h2>
-        <p className="text-xs text-secondary">{formatNumber(patients.length)} {t('common.inQueue')}</p>
+        <h2 className="text-base font-semibold text-primary mb-0.5">Waiting Patients</h2>
+        <p className="text-xs text-secondary">{formatNumber(patients.length)} in queue</p>
       </div>
 
       {/* Patient List */}
@@ -185,7 +184,7 @@ export default function WaitingPatientsList({ onSelectPatient, selectedPatientId
                   <p className={`text-xs mt-0.5 ${
                     isEmergency ? 'text-red-300' : 'text-secondary'
                   }`}>
-                    {formatNumber(patient.age)} {t('common.years')}, {patient.gender}
+                    {formatNumber(patient.age)} years, {patient.gender}
                   </p>
                 </div>
                 <span
@@ -195,7 +194,7 @@ export default function WaitingPatientsList({ onSelectPatient, selectedPatientId
                       : getPriorityColor(patient.priority)
                   }`}
                 >
-                  {isEmergency ? t('patient.emergency') : patient.priority}
+                  {isEmergency ? 'EMERGENCY' : patient.priority}
                 </span>
               </div>
 
@@ -213,7 +212,7 @@ export default function WaitingPatientsList({ onSelectPatient, selectedPatientId
                   <span>🕐 {patient.checkInTime}</span>
                 </div>
                 {selectedPatientId === patient.id && (
-                  <span className="text-[10px] text-cyan-400 font-medium">{t('common.selected')}</span>
+                  <span className="text-[10px] text-cyan-400 font-medium">Selected</span>
                 )}
               </div>
             </button>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,10 @@ export const dynamic = 'force-dynamic'
 // Creates an audit log entry
 export async function POST(request: NextRequest) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
     const body = await request.json()
     const { patientId, visitId, reason } = body
 
@@ -15,17 +20,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'patientId, visitId, and reason are required' },
         { status: 400 }
-      )
-    }
-
-    // Get current user (must be Admin)
-    const userIdCookie = request.cookies.get('zionmed_auth_token')
-    const roleCookie = request.cookies.get('zionmed_user_role')
-
-    if (!userIdCookie?.value || roleCookie?.value !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
       )
     }
 
@@ -59,7 +53,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (visit) {
-      const auditEntry = `[MANUAL OVERRIDE] QR Status cleared by Admin (${userIdCookie.value}) at ${new Date().toISOString()}. Reason: ${reason}`
+      const auditEntry = `[MANUAL OVERRIDE] QR Status cleared by Admin (${user.id}) at ${new Date().toISOString()}. Reason: ${reason}`
       await prisma.visit.update({
         where: { id: visitId },
         data: {

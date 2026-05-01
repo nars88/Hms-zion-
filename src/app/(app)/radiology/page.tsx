@@ -138,8 +138,8 @@ function buildRadUiMockPending(): ImagingRequest[] {
 
 function buildRadUiMockCompleted(): ImagingRequest[] {
   const rows: Array<{ name: string; test: string; hoursAgo: number; withImage: boolean }> = [
-    { name: 'زهراء أحمد علي', test: 'أشعة صدر — متابعة', hoursAgo: 6, withImage: true },
-    { name: 'مروان أحمد', test: 'Chest X-Ray (PA / lateral)', hoursAgo: 5, withImage: true },
+    { name: 'Zahra Ahmed Ali', test: 'Chest X-Ray - Follow-up', hoursAgo: 6, withImage: true },
+    { name: 'Marwan Ahmed', test: 'Chest X-Ray (PA / lateral)', hoursAgo: 5, withImage: true },
     { name: 'Nour Ali (mock)', test: 'CT correlation scout', hoursAgo: 4, withImage: false },
     { name: 'Omar Hassan (mock)', test: 'Full chest series', hoursAgo: 3, withImage: false },
   ]
@@ -471,7 +471,7 @@ export default function RadiologyDashboard() {
       </head>
       <body>
         <div class="header">
-          <div class="hospital">ZION Hospital</div>
+          <div class="hospital">NARS Hospital</div>
           <div class="sub">Diagnostic Imaging Report</div>
         </div>
         <div class="meta">

@@ -337,7 +337,7 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
 
   // Extract chronic diseases from medical history
   const chronicDiseases = fullPatient?.medicalHistory 
-    ? fullPatient.medicalHistory.split(/[،,]/).filter(d => d.trim() && d.trim() !== 'لا توجد' && d.trim() !== 'None').map(d => d.trim())
+    ? fullPatient.medicalHistory.split(/[,\u060C]/).filter(d => d.trim() && d.trim() !== 'None').map(d => d.trim())
     : []
 
   // Get last prescription
@@ -529,7 +529,7 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
               </div>
 
               {/* Allergies - Spans both columns */}
-              {(isEditMode || (fullPatient?.allergies && fullPatient.allergies !== 'لا توجد' && fullPatient.allergies !== 'None')) && (
+              {(isEditMode || (fullPatient?.allergies && fullPatient.allergies !== 'None')) && (
                 <div className="col-span-2">
                   <label className="text-secondary block mb-0.5 text-xs">Allergies:</label>
                   {isEditMode ? (

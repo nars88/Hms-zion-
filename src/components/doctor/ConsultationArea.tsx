@@ -26,7 +26,6 @@ import {
   Printer,
   AlertTriangle,
 } from 'lucide-react'
-import { useLanguage } from '@/contexts/LanguageContext'
 import { STANDARD_TEST_PRICES, COMMON_MEDICATIONS, QUICK_TAGS } from '@/constants'
 
 interface ConsultationAreaProps {
@@ -50,7 +49,6 @@ export default function ConsultationArea({ patient, onCompleteVisit, onBackToQue
   const { getInvoice, getInvoiceByPatientId, createInvoice, addInvoiceItem } = useCentralizedBilling()
   const { createPrescription } = usePharmacy()
   const { labRequests, addLabRequest, deleteLabRequest, getLabResultsForPatient } = useLabResults()
-  const { t, formatNumber } = useLanguage()
 
   const [diagnosis, setDiagnosis] = useState('')
   const [finalDisposition, setFinalDisposition] = useState<string>('')
@@ -383,7 +381,7 @@ export default function ConsultationArea({ patient, onCompleteVisit, onBackToQue
             '<p>Grand Total: ' + invoice.total.toLocaleString('en-US') + ' IQD</p>' +
           '</div>' +
           '<div class="footer">' +
-            '<p>Thank you for choosing ZION Hospital</p>' +
+            '<p>Thank you for choosing NARS Hospital</p>' +
             '<p>Generated on ' + new Date().toLocaleString('en-US') + '</p>' +
           '</div>' +
         '</body>' +

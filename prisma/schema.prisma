@@ -1,6 +1,5 @@
 generator client {
   provider      = "prisma-client-js"
-  // Vercel build + Node serverless run on Linux (OpenSSL 3). "native" keeps local Windows/macOS dev working.
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -76,29 +75,109 @@ model Triage {
 }
 
 model Visit {
-  id               String           @id @default(cuid())
+  id               String             @id @default(cuid())
   patientId        String
   doctorId         String?
-  status           VisitStatus      @default(Waiting)
-  /// ER bed slot (1–12) for nurse/doctor bed boards
-  bedNumber        Int?
+  status           VisitStatus        @default(Waiting)
   chiefComplaint   String?
   diagnosis        String?
   prescription     String?
   notes            String?
-  visitDate        DateTime         @default(now())
+  visitDate        DateTime           @default(now())
   dischargeDate    DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   finalDisposition String?
+  /// ER bed slot (1–12) for nurse/doctor bed boards
+  bedNumber        Int?
+  activity_history activity_history[]
   bill             Bill?
+  emergencyTasks   EmergencyTask[]
   exitPass         ExitPass?
   medicationOrders MedicationOrder?
-  doctor           User?            @relation(fields: [doctorId], references: [id])
-  patient          Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor           User?              @relation(fields: [doctorId], references: [id])
+  patient          Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
   vitals           Vitals[]
 
+  @@index([status], map: "idx_visits_status")
   @@map("visits")
+}
+
+model VisitSequenceCounter {
+  id         String            @id @default(cuid())
+  keyDate    String            @map("key_date")
+  kind       VisitSequenceKind
+  lastNumber Int               @default(0) @map("last_number")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  @@unique([keyDate, kind], map: "idx_visit_sequence_counters_key_kind_unique")
+  @@index([kind], map: "idx_visit_sequence_counters_kind")
+  @@map("visit_sequence_counters")
+}
+
+model EmergencyTask {
+  id                  String                     @id @default(uuid())
+  visitId             String
+  type                EmergencyTaskType
+  title               String
+  status              EmergencyTaskStatus        @default(PENDING)
+  prescribedBy        String?
+  executedBy          String?
+  /// Optional billing integration metadata.
+  billDepartment      String?
+  billUnitPrice       Decimal?                   @db.Decimal(10, 2)
+  billQuantity        Int?
+  billedAt            DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  category            EmergencyTaskCategory      @default(NURSING)
+  serviceCode         String?
+  releasedBy          String?
+  billingStatus       EmergencyTaskBillingStatus @default(NOT_BILLED)
+  billItemId          String?
+  orderedAt           DateTime?                  @default(now())
+  startedAt           DateTime?
+  releasedAt          DateTime?
+  resultText          String?
+  resultAttachmentUrl String?
+  resultMeta          Json?
+  service             ServiceCatalog?            @relation(fields: [serviceCode], references: [serviceCode])
+  visit               Visit                      @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId], map: "idx_emergency_tasks_visit_id")
+  @@index([status], map: "idx_emergency_tasks_status")
+  @@index([type], map: "idx_emergency_tasks_type")
+  @@index([category], map: "idx_emergency_tasks_category")
+  @@index([serviceCode], map: "idx_emergency_tasks_service_code")
+  @@index([billingStatus], map: "idx_emergency_tasks_billing_status")
+  @@map("emergency_tasks")
+}
+
+model ServiceCatalog {
+  id             String                @id @default(uuid())
+  serviceCode    String                @unique @map("service_code")
+  displayName    String                @map("display_name")
+  department     ServiceDepartment
+  taskCategory   EmergencyTaskCategory @map("task_category")
+  billingUnit    BillingUnit           @default(PER_TASK) @map("billing_unit")
+  basePrice      Decimal               @map("base_price") @db.Decimal(10, 2)
+  currency       String                @default("IQD")
+  isActive       Boolean               @default(true) @map("is_active")
+  effectiveFrom  DateTime              @default(now()) @map("effective_from")
+  effectiveTo    DateTime?             @map("effective_to")
+  createdBy      String?               @map("created_by")
+  updatedBy      String?               @map("updated_by")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  emergencyTasks EmergencyTask[]
+
+  @@index([department], map: "idx_service_catalog_department")
+  @@index([taskCategory], map: "idx_service_catalog_task_category")
+  @@index([isActive], map: "idx_service_catalog_is_active")
+  @@index([effectiveFrom, effectiveTo], map: "idx_service_catalog_effective_window")
+  @@map("service_catalog")
 }
 
 model Inventory {
@@ -117,6 +196,34 @@ model Inventory {
   medicationOrders MedicationOrder[]
 
   @@map("inventory")
+}
+
+/// Single-row app branding. Use id `default`. `logo_url` stores a site path e.g. `/uploads/branding/logo-….png` (not hotlinked URLs).
+model SystemSettings {
+  id         String   @id
+  systemName String   @default("NARS Hospital") @map("system_name")
+  logoUrl    String?  @map("logo_url")
+  updatedBy  String?  @map("updated_by")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+/// Append-only security / compliance trail for critical admin actions.
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  userName  String   @map("user_name")
+  userRole  String   @map("user_role")
+  action    String
+  metadata  Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)], map: "idx_audit_logs_created_at")
+  @@index([userId], map: "idx_audit_logs_user_id")
+  @@map("audit_logs")
 }
 
 model MedicationOrder {
@@ -178,21 +285,21 @@ model ExitPass {
 }
 
 model Vitals {
-  id          String   @id @default(cuid())
-  patientId   String
-  visitId     String?
-  recordedBy  String?
-  bp          String
-  temperature Float
-  heartRate   Int
-  weight      Float
+  id              String   @id @default(cuid())
+  patientId       String
+  visitId         String?
+  recordedBy      String?
+  bp              String
+  temperature     Float
+  heartRate       Int
+  weight          Float
+  recordedAt      DateTime @default(now())
   /// SpO₂ % (ER Vitals Station)
-  spo2        Float?
+  spo2            Float?
   /// e.g. "ER-Vitals" when recorded via ER Vitals Station (dedicated ER intake terminal)
   recordingSource String?
-  recordedAt  DateTime @default(now())
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  visit       Visit?   @relation(fields: [visitId], references: [id])
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visit           Visit?   @relation(fields: [visitId], references: [id])
 
   @@map("vitals")
 }
@@ -223,6 +330,19 @@ model departments {
   employee_ids     Json?
 }
 
+model activity_history {
+  id          String   @id
+  visitId     String
+  actorUserId String?
+  actorName   String?
+  action      String
+  details     String?
+  createdAt   DateTime @default(now())
+  visits      Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId, createdAt])
+}
+
 enum Department {
   CARDIOLOGY
   ORTHOPEDICS
@@ -244,17 +364,15 @@ enum UserRole {
   RECEPTIONIST
   SECRETARY
   INTAKE_NURSE
-  /// Dedicated ER vitals-room terminal (not general intake / reception)
-  ER_INTAKE_NURSE
   ER_NURSE
   LAB_TECH
   RADIOLOGY_TECH
+  /// Dedicated ER vitals-room terminal (not general intake / reception)
+  ER_INTAKE_NURSE
 }
 
 enum VisitStatus {
   Waiting
-  /// ER Vitals Station saved — awaiting physician
-  WAITING_FOR_DOCTOR
   In_Consultation
   Billing
   Discharged
@@ -262,6 +380,12 @@ enum VisitStatus {
   COMPLETED
   OUT_FOR_TEST
   READY_FOR_REVIEW
+  /// ER Vitals Station saved — awaiting physician
+  WAITING_FOR_DOCTOR
+  /// ER Quick Reception — awaiting intake vitals / bed
+  REGISTERED
+  /// Intake referred patient — visible on ER doctor board
+  WITH_DOCTOR
 }
 
 enum MedicationOrderStatus {
@@ -269,4 +393,60 @@ enum MedicationOrderStatus {
   DISPENSED
   OUT_OF_STOCK
   CLOSED
+}
+
+enum EmergencyTaskType {
+  NURSE_TASK
+  MED_ORDER
+}
+
+enum EmergencyTaskStatus {
+  CREATED
+  IN_PROGRESS
+  PENDING
+  COMPLETED
+  RELEASED
+  CANCELLED
+}
+
+enum EmergencyTaskCategory {
+  NURSING
+  DIAGNOSTIC_LAB
+  DIAGNOSTIC_RADIOLOGY
+  DIAGNOSTIC_SONAR
+  DIAGNOSTIC_ECG
+  BED_USAGE
+}
+
+enum EmergencyTaskBillingStatus {
+  NOT_BILLED
+  BILLED
+}
+
+enum ServiceDepartment {
+  ER
+  LAB
+  RADIOLOGY
+  SONAR
+  ECG
+  NURSING
+}
+
+enum BillingUnit {
+  PER_TASK
+  PER_HOUR
+  PER_MINUTE
+  PER_ITEM
+}
+
+enum VisitSequenceKind {
+  CLINIC
+  ER
+}
+
+enum VisitWorkflowState {
+  WAITING
+  TRIAGE
+  DOCTOR_READY
+  DISCHARGED
 }

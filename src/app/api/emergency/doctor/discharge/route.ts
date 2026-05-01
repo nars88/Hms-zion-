@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +14,14 @@ const ORDER_TO_RESULTS: Record<string, (typeof RESULTS_KEYS)[number]> = {
   SONAR_REQUESTED: 'sonarResults',
 }
 
-// POST /api/emergency/doctor/discharge - Set visit to Discharged, clear bed, append task to notes
+// POST /api/emergency/doctor/discharge - Move visit to Billing, clear bed, append task to notes
 // Blocks if any Lab/Radiology/Sonar request is still pending (no result uploaded).
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId } = body
     if (!visitId) {
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
     }
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, notes: true },
+      select: { id: true, notes: true, bedNumber: true },
     })
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
 
@@ -62,13 +67,17 @@ export async function POST(request: Request) {
     await prisma.visit.update({
       where: { id: visitId },
       data: {
-        status: VisitStatus.Discharged,
-        dischargeDate: new Date(),
-        notes: JSON.stringify(notesPayload),
+        // Keep bed occupied as pending-exit until Accountant confirms payment.
+        status: VisitStatus.Billing,
+        notes: JSON.stringify({
+          ...notesPayload,
+          bedExitState: visit.bedNumber != null ? 'PENDING_EXIT' : 'AVAILABLE',
+          bedExitMarkedAt: new Date().toISOString(),
+        }),
         updatedAt: new Date(),
       },
     })
-    return NextResponse.json({ success: true, message: 'Patient discharged, bed cleared' })
+    return NextResponse.json({ success: true, message: 'Patient moved to Billing queue; bed marked PENDING_EXIT until payment.' })
   } catch (e: any) {
     console.error('Error discharging:', e)
     return NextResponse.json({ error: e?.message || 'Failed to discharge' }, { status: 500 })

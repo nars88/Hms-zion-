@@ -24,6 +24,7 @@ interface WaitingPatient {
   firstName: string
   lastName: string
   phone: string
+  chiefComplaint: string | null
   triageLevel: number | null
   allergies: string | null
 }
@@ -33,6 +34,7 @@ export default function IntakePage() {
     <ProtectedRoute
       allowedRoles={[
         USER_ROLES.INTAKE_NURSE,
+        USER_ROLES.ER_INTAKE_NURSE,
         USER_ROLES.ER_NURSE,
         USER_ROLES.ADMIN,
       ]}
@@ -269,7 +271,7 @@ function IntakeNurseDashboard() {
               <CheckCircle className="h-7 w-7 text-white" />
             </div>
             <p className="text-base font-bold flex-1 text-right">
-              تم حفظ العلامات الحيوية للمريض بنجاح
+              Patient vital signs saved successfully
             </p>
             <button
               onClick={() => setShowToast(false)}
@@ -285,7 +287,9 @@ function IntakeNurseDashboard() {
       <section className="glass h-full rounded-xl border border-slate-800/60 p-6 pb-6 flex flex-col overflow-hidden">
         <div className="flex-1 flex gap-3 overflow-hidden min-h-0">
         {/* If user is not Intake Nurse, show read-only message */}
-        {user?.role !== USER_ROLES.INTAKE_NURSE && user?.role !== USER_ROLES.ADMIN ? (
+        {user?.role !== USER_ROLES.INTAKE_NURSE &&
+        user?.role !== USER_ROLES.ER_INTAKE_NURSE &&
+        user?.role !== USER_ROLES.ADMIN ? (
           <div className="w-full flex items-center justify-center text-center">
             <p className="text-xs text-slate-500 max-w-sm">
               Vitals entry is restricted to Intake Nurse staff. You can view the waiting
@@ -377,6 +381,9 @@ function IntakeNurseDashboard() {
                           <p className="text-xs text-slate-400">
                             {p.phone}
                           </p>
+                          <p className="mt-1 text-xs text-amber-200/90">
+                            Complaint: {p.chiefComplaint || 'Not specified'}
+                          </p>
                         </div>
                       </div>
                     </button>
@@ -402,6 +409,10 @@ function IntakeNurseDashboard() {
               onSubmit={handleSaveVitals}
               className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0"
             >
+              <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
+                <span className="font-semibold">Chief Complaint: </span>
+                {selectedPatient.chiefComplaint || 'Not specified'}
+              </div>
               <div className="flex-1 grid grid-cols-2 gap-3 overflow-y-auto pr-1 min-h-0">
                 {/* Row 1: BP and Temperature */}
                 <div className="flex flex-col">

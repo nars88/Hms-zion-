@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getRequestUser, unauthorized, forbidden } from '@/lib/apiAuth'
+import { writeAuditLog } from '@/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +23,25 @@ export async function GET(request: Request) {
     if (!user) return unauthorized()
     if (user.role !== 'ADMIN') return forbidden()
 
+    const USER_BACKUP_SELECT = {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      phone: true,
+      address: true,
+      education: true,
+      experience: true,
+      createdAt: true,
+      updatedAt: true,
+      departmentId: true,
+    } as const
+
     const [users, patients, visits, departments, bills] = await Promise.all([
-      prisma.user.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.user.findMany({
+        orderBy: { createdAt: 'asc' },
+        select: USER_BACKUP_SELECT,
+      }),
       prisma.patient.findMany({ orderBy: { createdAt: 'asc' } }),
       prisma.visit.findMany({ orderBy: { visitDate: 'asc' } }),
       prisma.$queryRawUnsafe<DepartmentRow[]>(
@@ -56,6 +74,13 @@ export async function GET(request: Request) {
         bills,
       },
     }
+
+    await writeAuditLog(prisma, {
+      actor: user,
+      request,
+      action: 'Created system backup (export)',
+      metadata: { counts: payload.meta.counts },
+    })
 
     return NextResponse.json(payload)
   } catch (error: unknown) {

@@ -3,7 +3,9 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-/** Always reset these demo accounts so login works even if they were created with wrong passwords earlier. */
+/** Standard demo password for key ER / admin accounts (upserted every seed). */
+const STANDARD_DEMO_PASSWORD = 'password123'
+
 const ZION_MED_DEMO_ACCOUNTS: Array<{
   email: string
   plainPassword: string
@@ -11,13 +13,6 @@ const ZION_MED_DEMO_ACCOUNTS: Array<{
   role: UserRole
   phone: string
 }> = [
-  {
-    email: 'doctor@zion.med',
-    plainPassword: 'doc123',
-    name: 'ER Doctor (Test)',
-    role: UserRole.DOCTOR,
-    phone: '+964 750 000 0011',
-  },
   {
     email: 'nurse@zion.med',
     plainPassword: 'nurse123',
@@ -55,7 +50,7 @@ async function main() {
     },
     {
       email: 'er-intake@zion.com',
-      password: 'zion1234',
+      password: STANDARD_DEMO_PASSWORD,
       name: 'ER Vitals Station',
       role: UserRole.ER_INTAKE_NURSE,
       phone: '+964 750 000 0014',
@@ -69,12 +64,12 @@ async function main() {
     },
     {
       email: 'doctor@zion.med',
-      password: 'doc123',
+      password: STANDARD_DEMO_PASSWORD,
       name: 'ER Doctor (Test)',
       role: UserRole.DOCTOR,
       phone: '+964 750 000 0011',
     },
-    // ^ ER Doctor: login with doctor@zion.med / doc123 → redirects to /emergency/doctor (role is DOCTOR)
+    // ^ ER Doctor: login with doctor@zion.med → redirects to /emergency/doctor (role is DOCTOR)
     {
       email: 'pharmacy@zion.com',
       password: 'zion123',
@@ -98,7 +93,7 @@ async function main() {
     },
     {
       email: 'ernurse@zionmed.com',
-      password: 'ernurse123',
+      password: STANDARD_DEMO_PASSWORD,
       name: 'ER Nurse',
       role: UserRole.ER_NURSE,
       phone: '+964 750 000 0007',
@@ -192,6 +187,58 @@ async function main() {
     }
   }
 
+  const standardAuthAccounts = [
+    {
+      email: 'admin@zion.med',
+      name: 'System Administrator',
+      role: UserRole.ADMIN,
+      phone: '+964 750 000 0016',
+    },
+    {
+      email: 'er-intake@zion.com',
+      name: 'ER Vitals Station',
+      role: UserRole.ER_INTAKE_NURSE,
+      phone: '+964 750 000 0014',
+    },
+    {
+      email: 'doctor@zion.med',
+      name: 'ER Doctor (Test)',
+      role: UserRole.DOCTOR,
+      phone: '+964 750 000 0011',
+    },
+    {
+      email: 'ernurse@zionmed.com',
+      name: 'ER Nurse',
+      role: UserRole.ER_NURSE,
+      phone: '+964 750 000 0007',
+    },
+  ] as const
+
+  for (const acc of standardAuthAccounts) {
+    try {
+      const password = await bcrypt.hash(STANDARD_DEMO_PASSWORD, 12)
+      await prisma.user.upsert({
+        where: { email: acc.email },
+        create: {
+          email: acc.email,
+          password,
+          name: acc.name,
+          role: acc.role,
+          phone: acc.phone,
+        },
+        update: {
+          password,
+          name: acc.name,
+          role: acc.role,
+          phone: acc.phone,
+        },
+      })
+      console.log(`✅ Standard auth: ${acc.email} / ${STANDARD_DEMO_PASSWORD}`)
+    } catch (error) {
+      console.error(`❌ Error upserting ${acc.email}:`, error)
+    }
+  }
+
   console.log('🌱 Seeding pharmacy inventory (sample drugs)...')
   const sampleDrugs = [
     { drugName: 'Paracetamol 500mg', currentStock: 100, unit: 'box', pricePerUnit: 5000, minThreshold: 10 },
@@ -207,6 +254,13 @@ async function main() {
       })
     } catch (_) {}
   }
+
+  await prisma.systemSettings.upsert({
+    where: { id: 'default' },
+    create: { id: 'default', systemName: 'NARS Hospital', logoUrl: null },
+    update: {},
+  })
+
   console.log('✨ Seeding completed!')
 }
 

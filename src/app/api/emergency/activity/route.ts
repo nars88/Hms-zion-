@@ -15,18 +15,27 @@ export async function GET(request: Request) {
     const visitId = url.searchParams.get('visitId')?.trim()
     if (!visitId) return NextResponse.json({ error: 'visitId is required' }, { status: 400 })
 
-    const rows = await prisma.activityHistory.findMany({
-      where: { visitId },
-      orderBy: { createdAt: 'desc' },
-      take: 30,
-      select: {
-        id: true,
-        action: true,
-        details: true,
-        actorName: true,
-        createdAt: true,
-      },
-    })
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        id: string
+        action: string
+        details: string | null
+        actorName: string | null
+        createdAt: Date
+      }>
+    >(
+      `SELECT
+         id,
+         action,
+         details,
+         actor_name AS "actorName",
+         created_at AS "createdAt"
+       FROM activity_history
+       WHERE visit_id = $1
+       ORDER BY created_at DESC
+       LIMIT 30`,
+      visitId
+    ).catch(() => [])
 
     return NextResponse.json(rows)
   } catch (error) {

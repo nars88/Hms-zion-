@@ -75,7 +75,7 @@ export async function GET(request: Request) {
         const notes = parseNotes(v.notes)
         const visitType = typeof notes.visitType === 'string' ? String(notes.visitType).toUpperCase() : 'CLINIC'
         const cc = (v.chiefComplaint || '').toLowerCase()
-        const isErByComplaint = cc.includes('emergency') || cc.includes('er') || cc.includes('طوارئ')
+        const isErByComplaint = cc.includes('emergency') || cc.includes('er')
         const isClinic = visitType === 'CLINIC' && !isErByComplaint
         if (!isClinic) return null
 

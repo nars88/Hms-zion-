@@ -180,7 +180,7 @@ const excludeErChiefComplaint: Prisma.VisitWhereInput = {
     OR: [
       { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
       { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-      { chiefComplaint: { contains: 'طوارئ' } },
+      { chiefComplaint: { contains: 'emergency', mode: 'insensitive' } },
     ],
   },
 }

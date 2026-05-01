@@ -69,7 +69,7 @@ const generateECGWaveform = (duration: number = 10, heartRate: number = 72) => {
 const mockECGReadings: ECGReading[] = [
   {
     id: 'dx-card-mock-1',
-    patientName: 'مريض تجريبي أ — Demo Alpha',
+    patientName: 'Test Patient A - Demo Alpha',
     patientId: 'DX-MOCK-CARD-01',
     date: '2026-04-24 09:30',
     duration: 10,
@@ -86,7 +86,7 @@ const mockECGReadings: ECGReading[] = [
   },
   {
     id: 'dx-card-mock-2',
-    patientName: 'مريض تجريبي ب — Demo Beta',
+    patientName: 'Test Patient B - Demo Beta',
     patientId: 'DX-MOCK-CARD-02',
     date: '2026-04-24 11:00',
     duration: 10,

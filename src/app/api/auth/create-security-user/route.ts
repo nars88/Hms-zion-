@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,15 @@ export const dynamic = 'force-dynamic'
 // This is a one-time setup endpoint
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== 'ADMIN') return forbidden()
+
+    const defaultPassword = process.env.DEFAULT_SECURITY_PASSWORD?.trim()
+    if (!defaultPassword) {
+      return NextResponse.json({ error: 'DEFAULT_SECURITY_PASSWORD is not configured' }, { status: 500 })
+    }
+
     // Check if security user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -35,7 +45,7 @@ export async function POST(request: Request) {
     const securityUser = await prisma.user.create({
       data: {
         email: 'security@zion.com',
-        password: 'Zion2026', // Plain text for now - TODO: hash with bcrypt in production
+        password: defaultPassword,
         name: 'Security Officer',
         role: UserRole.SECURITY,
         phone: '+964', // Default phone
@@ -52,10 +62,6 @@ export async function POST(request: Request) {
       success: true,
       message: 'Security user created successfully',
       user: securityUser,
-      credentials: {
-        email: 'security@zion.com',
-        password: 'Zion2026',
-      },
     })
   } catch (error: any) {
     console.error('❌ Error creating security user:', error)

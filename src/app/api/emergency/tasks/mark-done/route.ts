@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import { getRequestUser, forbidden, unauthorized } from '@/lib/apiAuth'
 import { logEmergencyActivity } from '@/lib/emergencyActivity'
+import { releaseBedFromVisit } from '@/lib/emergency/bedAllocation'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,19 +52,25 @@ export async function POST(request: Request) {
         }
       : { ...parsed, erOrders }
 
-    await prisma.visit.update({
-      where: { id: visitId },
-      data: {
-        notes: JSON.stringify(nextNotes),
-        updatedAt: now,
-        ...(nurseTask && visit.status !== VisitStatus.COMPLETED
-          ? {
-              status: VisitStatus.COMPLETED,
-              dischargeDate: now,
-              bedNumber: null,
-            }
-          : {}),
-      },
+    await prisma.$transaction(async (tx) => {
+      if (nurseTask && visit.status !== VisitStatus.COMPLETED) {
+        await releaseBedFromVisit(tx, visitId)
+      }
+
+      await tx.visit.update({
+        where: { id: visitId },
+        data: {
+          notes: JSON.stringify(nextNotes),
+          updatedAt: now,
+          ...(nurseTask && visit.status !== VisitStatus.COMPLETED
+            ? {
+                status: VisitStatus.COMPLETED,
+                dischargeDate: now,
+                bedNumber: null,
+              }
+            : {}),
+        },
+      })
     })
     if (nurseTask) {
       await logEmergencyActivity({

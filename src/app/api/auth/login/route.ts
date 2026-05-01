@@ -1,10 +1,40 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { signToken } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
+const DB_LOGIN_TIMEOUT_MS = 5000
+
+async function findUserWithRetry(email: string, retries = 2) {
+  let lastError: unknown = null
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const timeoutMarker = Symbol('db-timeout')
+      const user = await Promise.race([
+        prisma.user.findUnique({
+          where: { email },
+          select: { id: true, name: true, email: true, role: true, password: true },
+        }),
+        new Promise<typeof timeoutMarker>((resolve) => setTimeout(() => resolve(timeoutMarker), DB_LOGIN_TIMEOUT_MS)),
+      ])
+      if (user === timeoutMarker) {
+        throw new Error('Database login lookup timed out')
+      }
+      return user
+    } catch (error: unknown) {
+      lastError = error
+      const msg = error instanceof Error ? error.message : String(error)
+      if (!msg.includes('Timed out fetching a new connection') && !msg.includes('Database login lookup timed out')) {
+        throw error
+      }
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 120 * (attempt + 1)))
+      }
+    }
+  }
+  throw lastError
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,10 +42,7 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
-      select: { id: true, name: true, email: true, role: true, password: true },
-    })
+    const user = await findUserWithRetry(email.toLowerCase().trim())
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
@@ -24,10 +51,6 @@ export async function POST(request: Request) {
     let valid = await bcrypt.compare(password, user.password)
     if (!valid && !looksHashed && password === user.password) {
       valid = true
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { password: await bcrypt.hash(password, 12) },
-      })
     }
     if (!valid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
@@ -36,11 +59,7 @@ export async function POST(request: Request) {
     // Legacy CASHIER users are migrated to ACCOUNTANT (role removed from app UI).
     let roleOut = user.role
     if (String(user.role) === 'CASHIER') {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { role: UserRole.ACCOUNTANT },
-      })
-      roleOut = UserRole.ACCOUNTANT
+      roleOut = 'ACCOUNTANT'
     }
 
     const { password: _, ...safeUser } = { ...user, role: roleOut }
@@ -74,7 +93,11 @@ export async function POST(request: Request) {
     })
     return response
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Login failed' }, { status: 500 })
+    const message = String(error?.message || '')
+    if (message.includes('Timed out fetching a new connection') || message.includes('Database login lookup timed out')) {
+      return NextResponse.json({ error: 'Database is busy, please try again in a moment.' }, { status: 503 })
+    }
+    return NextResponse.json({ error: message || 'Login failed' }, { status: 500 })
   }
 }
 

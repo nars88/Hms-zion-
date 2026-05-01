@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // POST /api/pharmacy/orders/[orderId]/out-of-stock
 // Mark order as Out of Stock — triggers alert on Doctor and Nurse dashboards for that bed/visit.
 export async function POST(
-  _request: Request,
-  { params }: { params: { orderId: string } }
+  request: Request,
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const orderId = params.orderId
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { orderId } = await params
 
     const order = await prisma.medicationOrder.findUnique({
       where: { id: orderId },

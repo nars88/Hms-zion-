@@ -176,10 +176,9 @@ export default function ResultsReview() {
                 </div>
                 <div
                   className="flex items-start gap-2 rounded-lg border border-[#3d1f0f] bg-[#1a0f0a] p-2"
-                  dir="rtl"
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#f59e0b]" aria-hidden />
-                  <p className="text-sm leading-snug text-[#e2a870]">كسر بالضلع الثالث</p>
+                  <p className="text-sm leading-snug text-[#e2a870]">Fracture in the third rib</p>
                 </div>
                 <button
                   type="button"

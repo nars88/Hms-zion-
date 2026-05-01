@@ -3,17 +3,16 @@
 import { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, LayoutGrid } from 'lucide-react'
+import { LayoutGrid } from 'lucide-react'
 import ZionMedLogo from '@/components/ZionMedLogo'
 import SidebarFooter from '@/components/shared/SidebarFooter'
 import { useAuth } from '@/contexts/AuthContext'
 
 const ER_DOCTOR_ITEMS = [
-  { href: '/er/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/er/clinic', label: 'ER Clinic', Icon: LayoutGrid },
+  { href: '/er/clinic', label: 'Clinical Hub', Icon: LayoutGrid },
 ] as const
 
-/** ER specialist: Dashboard + ER Clinic only (no vitals station, no mobile tasks). */
+/** ER specialist: single clinic entry only (no vitals station, no mobile tasks). */
 export default function ERRoleSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()

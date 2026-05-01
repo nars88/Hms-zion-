@@ -38,6 +38,11 @@ export async function GET() {
           },
         },
         bill: true,
+        medicationOrders: {
+          select: {
+            status: true,
+          },
+        },
         doctor: {
           select: {
             id: true,
@@ -53,16 +58,46 @@ export async function GET() {
     // Map all visits with bills (both paid and unpaid)
     const allBills = visits
       .filter((visit) => visit.bill) // Only include visits with bills
-      .map((visit) => ({
-        visitId: visit.id,
-        patientId: visit.patientId,
-        patientName: visit.patient ? `${visit.patient.firstName} ${visit.patient.lastName}` : 'Patient info missing',
-        patientPhone: visit.patient?.phone ?? '',
-        doctorName: visit.doctor?.name || 'Unknown',
-        bill: visit.bill,
-        visitDate: visit.createdAt,
-        completedAt: visit.updatedAt,
-      }))
+      .map((visit) => {
+        const medOrderStatus = visit.medicationOrders?.status || null
+        const undispensed =
+          medOrderStatus === 'PENDING' ||
+          medOrderStatus === 'OUT_OF_STOCK'
+
+        const billItems =
+          ((visit.bill!.items as Array<{
+            department?: string
+            description?: string
+            quantity?: number
+            unitPrice?: number
+            total?: number
+          }>) || [])
+            // Golden rule: Accountant ignores non-dispensed pharmacy costs.
+            .filter((item) => !(undispensed && String(item.department || '').toLowerCase() === 'pharmacy'))
+
+        const subtotal = billItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+        const tax = Number(visit.bill!.tax) || 0
+        const discount = Number(visit.bill!.discount) || 0
+        const total = subtotal + tax - discount
+
+        return {
+          visitId: visit.id,
+          patientId: visit.patientId,
+          patientName: visit.patient ? `${visit.patient.firstName} ${visit.patient.lastName}` : 'Patient info missing',
+          patientPhone: visit.patient?.phone ?? '',
+          doctorName: visit.doctor?.name || 'Unknown',
+          bill: {
+            ...visit.bill,
+            items: billItems,
+            subtotal,
+            total,
+          },
+          hasUndispensedMedications: undispensed,
+          undispensedMedicationStatus: medOrderStatus,
+          visitDate: visit.createdAt,
+          completedAt: visit.updatedAt,
+        }
+      })
 
     return NextResponse.json({
       success: true,

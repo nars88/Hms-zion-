@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // PUT /api/pharmacy/inventory/[id] – update drug
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { id } = await params
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const row = await prisma.inventory.findUnique({ where: { id } })
     if (!row) return NextResponse.json({ error: 'Drug not found' }, { status: 404 })
@@ -61,10 +66,14 @@ export async function PUT(
 // PATCH /api/pharmacy/inventory/[id] – soft-delete (set deletedAt)
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { id } = await params
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const row = await prisma.inventory.findUnique({ where: { id } })
     if (!row) return NextResponse.json({ error: 'Drug not found' }, { status: 404 })

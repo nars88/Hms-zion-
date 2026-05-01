@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,10 @@ const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png']
 // POST /api/upload/diagnostic - Upload PDF/JPG/PNG for diagnostic result (linked to visitId)
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['LAB_TECH', 'RADIOLOGY_TECH', 'ADMIN'].includes(user.role)) return forbidden()
+
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const visitId = formData.get('visitId') as string | null

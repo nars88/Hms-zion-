@@ -2,28 +2,68 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MedicationOrderStatus, VisitStatus } from '@prisma/client'
 import { getMedicationAllergyConflicts } from '@/lib/pharmacySafety'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
-type OrderItem = { medicineName?: string; dosage?: string; quantity?: number; unitPrice?: number; totalPrice?: number }
+type OrderItem = {
+  medicationId?: string
+  medicineName?: string
+  dosage?: string
+  quantity?: number
+  unitPrice?: number
+  totalPrice?: number
+}
 
 // POST /api/pharmacy/orders/[orderId]/dispense
 // Atomic: validate stock, deduct inventory, set DISPENSED, add invoice items. Visit must not be closed.
 // ARCHIVE ONLY: prescription/order record is never deleted; status is updated to DISPENSED for history/reports.
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const orderId = params.orderId
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['PHARMACIST', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const { orderId } = await params
     const body = (await request.json().catch(() => ({}))) as {
       selectedItems?: Array<{ medicineName?: string; medication?: string; dosage?: string; quantity?: number }>
     }
 
+    if (!orderId || typeof orderId !== 'string' || orderId.trim().length < 8) {
+      return NextResponse.json(
+        {
+          error: 'Invalid orderId format',
+          details: { orderId: orderId ?? null },
+        },
+        { status: 400 }
+      )
+    }
+
+    const normalizedOrderId = orderId.trim()
+
     const order = await prisma.medicationOrder.findUnique({
-      where: { id: orderId },
-      include: {
-        visit: { include: { bill: true, patient: true } },
+      where: { id: normalizedOrderId },
+      select: {
+        id: true,
+        status: true,
+        items: true,
+        visit: {
+          select: {
+            id: true,
+            patientId: true,
+            doctorId: true,
+            status: true,
+            bill: true,
+            patient: {
+              select: {
+                allergies: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -41,17 +81,34 @@ export async function POST(
     }
 
     const payloadItems = Array.isArray(body.selectedItems) ? body.selectedItems : []
-    const orderItems =
+    const rawOrderItems =
       payloadItems.length > 0
         ? payloadItems.map((i) => ({
+            medicationId: '',
             medicineName: String(i.medicineName || i.medication || '').trim(),
             dosage: String(i.dosage || '').trim(),
             quantity: Number(i.quantity) || 1,
           }))
         : ((order.items as OrderItem[]) || [])
-    if (orderItems.length === 0) {
+    if (rawOrderItems.length === 0) {
       return NextResponse.json({ error: 'Order has no items' }, { status: 400 })
     }
+    // Group same medication into one line and sum quantity.
+    const grouped = new Map<string, OrderItem>()
+    for (const item of rawOrderItems) {
+      const key = [
+        String(item.medicationId || item.medicineName || '').toLowerCase(),
+        String(item.dosage || '').toLowerCase(),
+      ].join('|')
+      const existing = grouped.get(key)
+      if (!existing) {
+        grouped.set(key, { ...item, quantity: Math.max(1, Number(item.quantity) || 1) })
+        continue
+      }
+      existing.quantity = Math.max(1, Number(existing.quantity) || 1) + Math.max(1, Number(item.quantity) || 1)
+    }
+    const orderItems = Array.from(grouped.values())
+
     const medicationNames = orderItems.map((item) => String(item.medicineName || '').trim()).filter(Boolean)
     const allergyConflicts = getMedicationAllergyConflicts(medicationNames, visit.patient?.allergies || null)
     if (allergyConflicts.length > 0) {
@@ -92,24 +149,20 @@ export async function POST(
       })
     }
 
-    type Resolved = { item: OrderItem; inv: { id: string; drugName: string; currentStock: number; pricePerUnit: unknown }; qty: number }
+    type Resolved = {
+      item: OrderItem
+      inv: { id: string; drugName: string; currentStock: number; pricePerUnit: unknown } | null
+      qty: number
+    }
     const resolved: Resolved[] = []
     for (const item of orderItems) {
       const name = (item.medicineName || '').trim()
       const qty = Math.max(1, Number(item.quantity) || 1)
       const inv = findInventoryMatch(name)
-      console.log('[Pharmacy Dispense] Stock check:', {
-        orderId,
-        requestedMedicine: name,
-        requestedQty: qty,
-        matchedInventoryDrug: inv?.drugName ?? null,
-        availableStock: inv?.currentStock ?? 0,
-      })
       if (!inv) {
-        return NextResponse.json(
-          { error: `Insufficient Stock: "${name}" not found in inventory. Add the drug to inventory first.` },
-          { status: 400 }
-        )
+        // Workflow bypass for "N/A stock": allow dispensing and billing even when inventory entry does not exist.
+        resolved.push({ item, inv: null, qty })
+        continue
       }
       if (inv.currentStock < qty) {
         return NextResponse.json(
@@ -159,11 +212,13 @@ export async function POST(
 
     const existingItems = (bill.items as Array<{ department?: string; description?: string; quantity?: number; unitPrice?: number; total?: number }>) || []
     const newBillItems = resolved.map(({ item, inv, qty }) => {
-      const unitPrice = Number(inv.pricePerUnit)
+      const fallbackUnitPrice = Number(item.unitPrice || 0)
+      const unitPriceRaw = inv ? Number(inv.pricePerUnit) : fallbackUnitPrice
+      const unitPrice = Number.isFinite(unitPriceRaw) ? unitPriceRaw : 0
       const total = unitPrice * qty
       return {
         department: 'Pharmacy',
-        description: `${item.medicineName || inv.drugName} ${(item.dosage || '').trim()}`.trim() || inv.drugName,
+        description: `${item.medicineName || inv?.drugName || 'Medication'} ${(item.dosage || '').trim()}`.trim(),
         quantity: qty,
         unitPrice,
         total,
@@ -174,23 +229,30 @@ export async function POST(
     const total = subtotal + Number(bill.tax) - Number(bill.discount)
     const totalCost = newBillItems.reduce((s, i) => s + (Number(i.total) || 0), 0)
 
-    const updatedOrderItems = resolved.map(({ item, inv, qty }) => ({
-      medicineName: item.medicineName || inv.drugName,
+    const updatedOrderItems = resolved.map(({ item, inv, qty }) => {
+      const fallbackUnitPrice = Number(item.unitPrice || 0)
+      const unitPriceRaw = inv ? Number(inv.pricePerUnit) : fallbackUnitPrice
+      const unitPrice = Number.isFinite(unitPriceRaw) ? unitPriceRaw : 0
+      return {
+      medicineName: item.medicineName || inv?.drugName || 'Medication',
       dosage: item.dosage,
       quantity: qty,
-      unitPrice: Number(inv.pricePerUnit),
-      totalPrice: Number(inv.pricePerUnit) * qty,
-    }))
+      unitPrice,
+      totalPrice: unitPrice * qty,
+    }
+    })
 
     await prisma.$transaction([
-      ...resolved.map(({ inv, qty }) =>
+      ...resolved
+        .filter((row) => row.inv)
+        .map(({ inv, qty }) =>
         prisma.inventory.update({
-          where: { id: inv.id },
-          data: { currentStock: inv.currentStock - qty, updatedAt: new Date() },
+          where: { id: inv!.id },
+          data: { currentStock: inv!.currentStock - qty, updatedAt: new Date() },
         })
       ),
       prisma.medicationOrder.update({
-        where: { id: orderId },
+        where: { id: normalizedOrderId },
         data: {
           status: MedicationOrderStatus.DISPENSED,
           totalCost,
@@ -226,7 +288,20 @@ export async function POST(
       totalAdded: totalCost,
     })
   } catch (e) {
-    console.error('Dispense error:', e)
-    return NextResponse.json({ error: 'Failed to dispense' }, { status: 500 })
+    const err = e as Error & { code?: string; meta?: unknown }
+    console.error('Dispense error:', {
+      message: err?.message,
+      code: err?.code,
+      meta: err?.meta,
+      stack: err?.stack,
+    })
+    return NextResponse.json(
+      {
+        error: err?.message || 'Failed to dispense',
+        code: err?.code || 'DISPENSE_INTERNAL_ERROR',
+        meta: err?.meta ?? null,
+      },
+      { status: 500 }
+    )
   }
 }

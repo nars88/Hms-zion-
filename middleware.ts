@@ -5,13 +5,14 @@ import { verifyToken } from '@/lib/jwt'
 // ── Public paths (never touched by JWT logic) ──────────────────────────
 // Exact-match paths. `/` must only be treated as public when accessed as "/",
 // not as a prefix (otherwise it would match every URL).
-const PUBLIC_EXACT = new Set<string>(['/login'])
+const PUBLIC_EXACT = new Set<string>(['/', '/login'])
 
 // Prefix-match paths. Anything starting with these is treated as public.
 const PUBLIC_PREFIXES = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/verify-role',
+  '/api/system/branding',
   '/api/health',
   '/api/scanner',
   '/_next',
@@ -25,6 +26,7 @@ const STATIC_FILE_RE = /\.(ico|png|jpg|jpeg|gif|svg|webp|css|js|map|woff|woff2|t
 // ADMIN is implicitly allowed everywhere; everyone else is bound here.
 // Longer prefixes first (checked in order below).
 const ROLE_ROUTES: Record<string, string[]> = {
+  '/er-reception': ['RECEPTIONIST', 'ADMIN'],
   '/er/mobile-tasks': ['ER_NURSE', 'ADMIN'],
   '/er/vitals-station': ['ER_INTAKE_NURSE', 'ADMIN'],
   '/er/clinic': ['DOCTOR', 'ADMIN'],
@@ -41,6 +43,20 @@ const ROLE_ROUTES: Record<string, string[]> = {
 }
 
 const ROLE_ROUTE_ENTRIES = Object.entries(ROLE_ROUTES).sort((a, b) => b[0].length - a[0].length)
+const API_MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
+const API_ROLE_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
+  { prefix: '/api/admin', roles: ['ADMIN'] },
+  { prefix: '/api/employees', roles: ['ADMIN'] },
+  { prefix: '/api/doctor', roles: ['DOCTOR', 'ADMIN'] },
+  { prefix: '/api/emergency/doctor', roles: ['DOCTOR', 'ADMIN'] },
+  { prefix: '/api/pharmacy', roles: ['PHARMACIST', 'ADMIN'] },
+  { prefix: '/api/accountant', roles: ['ACCOUNTANT', 'ADMIN'] },
+  { prefix: '/api/lab', roles: ['LAB_TECH', 'ADMIN'] },
+  { prefix: '/api/radiology', roles: ['RADIOLOGY_TECH', 'ADMIN'] },
+]
+
+/** These prefixes require ADMIN for every method (including GET). */
+const API_ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/employees'] as const
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -57,11 +73,34 @@ export async function middleware(request: NextRequest) {
   // ── SECOND: static files ──
   if (STATIC_FILE_RE.test(pathname)) return NextResponse.next()
 
-  // ── THIRD: API routes — token presence only, handlers re-verify ──
+  // ── THIRD: API routes — verify JWT + RBAC (defense in depth with route handlers)
   if (pathname.startsWith('/api/')) {
+    // CORS preflight does not send cookies; do not block browsers from proceeding.
+    if (request.method === 'OPTIONS') {
+      return NextResponse.next()
+    }
     const token = request.cookies.get('zionmed_auth_token')
-    if (!token) {
+    const tokenValue = token?.value?.trim()
+    if (!tokenValue) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const payload = await verifyToken(tokenValue)
+    if (!payload?.role) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    for (const prefix of API_ADMIN_ONLY_PREFIXES) {
+      if (pathname.startsWith(prefix) && payload.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
+    if (API_MUTATING_METHODS.has(request.method.toUpperCase())) {
+      for (const rule of API_ROLE_PREFIXES) {
+        if (pathname.startsWith(rule.prefix) && !rule.roles.includes(payload.role)) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
     }
     return NextResponse.next()
   }
@@ -81,9 +120,12 @@ export async function middleware(request: NextRequest) {
       verifyToken(tokenValue),
       new Promise<typeof VERIFY_TIMEOUT>((resolve) => setTimeout(() => resolve(VERIFY_TIMEOUT), 2000)),
     ])
-    // Fail-open on timeout only: avoid UI lock/hang if runtime is slow.
+    // Fail-closed: do not allow navigation on slow/ambiguous verification.
     if (verifyResult === VERIFY_TIMEOUT) {
-      return NextResponse.next()
+      const response = NextResponse.redirect(new URL('/login', request.url))
+      response.cookies.delete('zionmed_auth_token')
+      response.cookies.delete('zionmed_user_role')
+      return response
     }
     payload = verifyResult
   } catch {
@@ -159,5 +201,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
+  // Include `/api/*` so JWT + RBAC run on API routes (public `/api/auth/*` etc. still exit early above).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],
 }

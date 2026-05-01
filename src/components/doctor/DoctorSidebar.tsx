@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ZionMedLogo from '@/components/ZionMedLogo'
 import SidebarFooter from '@/components/shared/SidebarFooter'
+import { useBranding } from '@/contexts/BrandingContext'
 import { ListOrdered, Calendar, Stethoscope } from 'lucide-react'
 
 const NAV_ITEMS: { view: string; label: string; icon: ElementType }[] = [
@@ -14,6 +15,7 @@ const NAV_ITEMS: { view: string; label: string; icon: ElementType }[] = [
 
 export default function DoctorSidebar() {
   const pathname = usePathname()
+  const { systemName } = useBranding()
 
   return (
     <aside
@@ -60,7 +62,9 @@ export default function DoctorSidebar() {
       </nav>
 
       <div className="flex-shrink-0 border-t border-slate-800/50 flex flex-col">
-        <p className="text-[11px] text-slate-500 px-4 pt-3 pb-1">ZION HMS</p>
+        <p className="text-[11px] text-slate-500 px-4 pt-3 pb-1 truncate" title={systemName}>
+          {systemName}
+        </p>
         <SidebarFooter />
       </div>
     </aside>

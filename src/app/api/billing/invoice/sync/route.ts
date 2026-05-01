@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
+const ER_ADMISSION_MARKER = 'ER Admission Fee'
 
 // POST /api/billing/invoice/sync
 // Syncs invoice items to database Bill model
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['ACCOUNTANT', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, patientId, items, subtotal, tax, discount, total, generatedBy } = body
+    const incomingItems = Array.isArray(items) ? items : null
 
     if (!visitId || !patientId) {
       return NextResponse.json(
@@ -21,6 +29,25 @@ export async function POST(request: Request) {
     let bill = await prisma.bill.findUnique({
       where: { visitId },
     })
+
+    if (bill && incomingItems && user.role !== 'ADMIN') {
+      const existingItems = Array.isArray(bill.items) ? bill.items : []
+      const existingAdmission = existingItems.find((item: any) =>
+        String(item?.description || '').toLowerCase().includes(ER_ADMISSION_MARKER.toLowerCase())
+      ) as { total?: number; description?: string } | undefined
+      const incomingAdmission = incomingItems.find((item: any) =>
+        String(item?.description || '').toLowerCase().includes(ER_ADMISSION_MARKER.toLowerCase())
+      ) as { total?: number; description?: string } | undefined
+      if (
+        existingAdmission &&
+        (!incomingAdmission || Number(incomingAdmission.total || 0) !== Number(existingAdmission.total || 0))
+      ) {
+        return NextResponse.json(
+          { error: 'ER Admission Fee is locked for non-admin invoice sync operations.' },
+          { status: 403 }
+        )
+      }
+    }
 
     if (!bill) {
       bill = await prisma.bill.create({
@@ -40,7 +67,7 @@ export async function POST(request: Request) {
       bill = await prisma.bill.update({
         where: { id: bill.id },
         data: {
-          items: items || bill.items,
+          items: (incomingItems || bill.items) as Prisma.InputJsonValue,
           subtotal: subtotal !== undefined ? subtotal : bill.subtotal,
           tax: tax !== undefined ? tax : bill.tax,
           discount: discount !== undefined ? discount : bill.discount,

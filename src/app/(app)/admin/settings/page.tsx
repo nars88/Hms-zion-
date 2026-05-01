@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Download } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useAuth, USER_ROLES, type UserRole } from '@/contexts/AuthContext'
 import { SPECIALTY_LABEL_BY_NAME } from '@/lib/departmentSpecialties'
 
@@ -69,9 +69,6 @@ export default function SettingsPage() {
 
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [loadingDepartments, setLoadingDepartments] = useState(true)
-  const [backupLoading, setBackupLoading] = useState(false)
-
-  const isAdmin = user?.role === 'ADMIN'
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
@@ -144,41 +141,6 @@ export default function SettingsPage() {
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 3000)
   }, [])
-
-  const handleExportBackup = useCallback(async () => {
-    if (backupLoading) return
-    try {
-      setBackupLoading(true)
-      const res = await fetch('/api/admin/backup', { cache: 'no-store' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || `Backup failed (HTTP ${res.status})`)
-      }
-      const payload = await res.json()
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: 'application/json',
-      })
-      const url = URL.createObjectURL(blob)
-      const now = new Date()
-      const dd = String(now.getDate()).padStart(2, '0')
-      const mm = String(now.getMonth() + 1).padStart(2, '0')
-      const yyyy = now.getFullYear()
-      const filename = `zion_backup_${dd}-${mm}-${yyyy}.json`
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      showToast('success', 'Backup downloaded successfully')
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to export backup'
-      showToast('error', message)
-    } finally {
-      setBackupLoading(false)
-    }
-  }, [backupLoading, showToast])
 
   const loadEmployees = useCallback(async () => {
     try {
@@ -445,27 +407,6 @@ export default function SettingsPage() {
               />
             </div>
             <div className="flex shrink-0 items-stretch gap-2">
-              {isAdmin ? (
-                <button
-                  type="button"
-                  onClick={handleExportBackup}
-                  disabled={backupLoading}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-600 to-sky-600 px-5 text-sm font-semibold text-white shadow-lg shadow-cyan-900/30 transition hover:from-cyan-500 hover:to-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-busy={backupLoading}
-                >
-                  {backupLoading ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      Preparing backup…
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" aria-hidden />
-                      Export System Backup
-                    </>
-                  )}
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}

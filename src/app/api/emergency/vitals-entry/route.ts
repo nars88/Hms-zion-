@@ -6,7 +6,7 @@ import { logEmergencyActivity } from '@/lib/emergencyActivity'
 
 export const dynamic = 'force-dynamic'
 
-/** ER Vitals Station: BP, Temp, HR, SpO₂ → Vitals row + visit WAITING_FOR_DOCTOR */
+/** ER Vitals Station: BP, Temp, HR, SpO₂ → Vitals row + visit WITH_DOCTOR (referred to physician) */
 export async function POST(request: Request) {
   try {
     const user = await getRequestUser(request)
@@ -62,38 +62,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'SpO₂ 50–100%.' }, { status: 400 })
     }
 
-    const visit = await prisma.visit.findFirst({
-      where: {
-        id: visitId,
-        patientId,
-        OR: [
-          { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-          { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-        ],
-      },
-    })
+    const visitRows = await prisma.$queryRaw<Array<{ id: string; notes: string | null; bedNumber: number | null }>>`
+      SELECT "id", "notes", "bedNumber"
+      FROM "visits"
+      WHERE "id" = ${visitId}
+        AND "patientId" = ${patientId}
+        AND (
+          "status" = CAST(${String(VisitStatus.REGISTERED)} AS "VisitStatus")
+          OR "chiefComplaint" ILIKE ${'%Emergency%'}
+          OR "chiefComplaint" ILIKE ${'%ER%'}
+        )
+      LIMIT 1
+    `
+    const visit = visitRows[0] ?? null
     if (!visit) {
       return NextResponse.json({ error: 'ER visit not found.' }, { status: 404 })
     }
     // Ensure incoming ER patient can be rendered on Doctor Bed Grid immediately.
-    // If the visit has no bed yet, auto-assign first available ER bed.
     let assignedBedNumber = visit.bedNumber ?? null
     if (assignedBedNumber == null) {
-      const occupiedBeds = await prisma.visit.findMany({
-        where: {
-          id: { not: visit.id },
-          bedNumber: { not: null },
-          status: { notIn: [VisitStatus.Discharged, VisitStatus.COMPLETED] },
-          OR: [
-            { chiefComplaint: { contains: 'Emergency', mode: 'insensitive' } },
-            { chiefComplaint: { contains: 'ER', mode: 'insensitive' } },
-          ],
-        },
-        select: { bedNumber: true },
-      })
+      const occupiedRows = await prisma.$queryRaw<Array<{ bedNumber: number | null }>>`
+        SELECT "bedNumber"
+        FROM "visits"
+        WHERE "id" <> ${visitId}
+          AND "bedNumber" IS NOT NULL
+          AND "status" NOT IN (
+            CAST(${String(VisitStatus.Discharged)} AS "VisitStatus"),
+            CAST(${String(VisitStatus.COMPLETED)} AS "VisitStatus")
+          )
+      `
       const occupied = new Set(
-        occupiedBeds
-          .map((b) => b.bedNumber)
+        occupiedRows
+          .map((r) => r.bedNumber)
           .filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
       )
       for (let bed = 1; bed <= 12; bed += 1) {
@@ -101,9 +101,6 @@ export async function POST(request: Request) {
           assignedBedNumber = bed
           break
         }
-      }
-      if (assignedBedNumber == null) {
-        return NextResponse.json({ error: 'No ER beds available. Free a bed first.' }, { status: 409 })
       }
     }
 
@@ -156,8 +153,8 @@ export async function POST(request: Request) {
       })
     }
 
-    await prisma.$transaction([
-      prisma.vitals.create({
+    await prisma.$transaction(async (tx) => {
+      await tx.vitals.create({
         data: {
           patientId,
           visitId,
@@ -169,17 +166,23 @@ export async function POST(request: Request) {
           recordedBy: user.id,
           recordingSource: 'ER-Vitals',
         },
-      }),
-      prisma.visit.update({
-        where: { id: visitId },
-        data: {
-          status: VisitStatus.WAITING_FOR_DOCTOR,
-          bedNumber: assignedBedNumber,
-          notes: nextNotes,
-          updatedAt: new Date(),
-        },
-      }),
-    ])
+      })
+
+      const allocatedBedNumber: number | null =
+        typeof assignedBedNumber === 'number' && Number.isFinite(assignedBedNumber)
+          ? assignedBedNumber
+          : null
+
+      await tx.$executeRaw`
+        UPDATE "visits"
+        SET
+          "status" = CAST(${String(VisitStatus.WITH_DOCTOR)} AS "VisitStatus"),
+          "bedNumber" = COALESCE(${allocatedBedNumber}, "bedNumber"),
+          "notes" = ${nextNotes},
+          "updatedAt" = ${new Date()}
+        WHERE "id" = ${visitId}
+      `
+    })
 
     await logEmergencyActivity({
       visitId,
@@ -190,7 +193,8 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true }, { status: 201 })
-  } catch {
+  } catch (error) {
+    console.error('emergency/vitals-entry failed:', error)
     return NextResponse.json({ error: 'Failed to save vitals.' }, { status: 500 })
   }
 }

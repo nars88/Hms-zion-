@@ -13,7 +13,7 @@ export default function TransactionHistoryPage() {
 
   return (
     <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT, USER_ROLES.ADMIN]}>
-      <div className="flex h-screen bg-[#0B1120] overflow-hidden">
+      <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SmartSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Main Content */}

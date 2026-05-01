@@ -3,18 +3,18 @@ const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 
-/** Always reset so doctor@zion.med / doc123 works even if DB had wrong password. */
+/** Same password as journey test users (password123) for predictable demos. */
 const ZION_MED_DEMO_ACCOUNTS = [
   {
     email: 'doctor@zion.med',
-    plainPassword: 'doc123',
+    plainPassword: 'password123',
     name: 'ER Doctor (Test)',
     role: 'DOCTOR',
     phone: '+964 750 000 0011',
   },
   {
     email: 'nurse@zion.med',
-    plainPassword: 'nurse123',
+    plainPassword: 'password123',
     name: 'ER Nurse (Test)',
     role: 'ER_NURSE',
     phone: '+964 750 000 0010',
@@ -49,8 +49,8 @@ async function main() {
     },
     {
       email: 'er-intake@zion.com',
-      password: 'zion1234',
-      name: 'ER Vitals Station',
+      password: 'password123',
+      name: 'ER Intake Nurse (Journey Test)',
       role: 'ER_INTAKE_NURSE',
       phone: '+964 750 000 0014',
     },
@@ -63,7 +63,7 @@ async function main() {
     },
     {
       email: 'doctor@zion.med',
-      password: 'doc123',
+      password: 'password123',
       name: 'ER Doctor (Test)',
       role: 'DOCTOR',
       phone: '+964 750 000 0011',
@@ -84,8 +84,8 @@ async function main() {
     },
     {
       email: 'ernurse@zionmed.com',
-      password: 'ernurse123',
-      name: 'ER Nurse',
+      password: 'password123',
+      name: 'ER Task Nurse (Journey Test)',
       role: 'ER_NURSE',
       phone: '+964 750 000 0007',
     },
@@ -130,6 +130,13 @@ async function main() {
       name: 'Radiology Technician',
       role: 'RADIOLOGY_TECH',
       phone: '+964 750 000 0013',
+    },
+    {
+      email: 'er-reception@zionmed.com',
+      password: 'password123',
+      name: 'ER Quick Reception (Journey Test)',
+      role: 'RECEPTIONIST',
+      phone: '+964 750 000 0015',
     },
   ]
 
@@ -182,6 +189,12 @@ async function main() {
       console.error(`❌ Error upserting ${acc.email}:`, error)
     }
   }
+
+  await prisma.systemSettings.upsert({
+    where: { id: 'default' },
+    create: { id: 'default', systemName: 'NARS Hospital', logoUrl: null },
+    update: {},
+  })
 
   console.log('✨ Seeding completed!')
 }

@@ -21,7 +21,7 @@ export default function ManagerDashboard() {
 
   return (
     <ProtectedRoute allowedRoles={['ADMIN']} redirectTo="/">
-      <div className="flex h-screen bg-[#0B1120] overflow-hidden">
+      <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SidebarWrapper />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Main Content */}

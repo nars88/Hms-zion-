@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,10 @@ type Department = 'Lab' | 'Radiology' | 'Sonar' | 'ECG'
 // Mark diagnostic result as reviewed (stops pulse on bed card; icon stays green)
 export async function POST(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+
     const body = await request.json()
     const { visitId, department } = body as { visitId?: string; department?: Department }
     if (!visitId || !department || !['Lab', 'Radiology', 'Sonar', 'ECG'].includes(department)) {
