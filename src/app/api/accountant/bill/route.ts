@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { UserRole } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +9,10 @@ export const dynamic = 'force-dynamic'
 // Returns a single bill (for viewing invoice from archive or deep link)
 export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.ACCOUNTANT && user.role !== UserRole.ADMIN) return forbidden()
+
     const { searchParams } = new URL(request.url)
     const visitId = searchParams.get('visitId')
     if (!visitId) {

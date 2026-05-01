@@ -367,7 +367,9 @@ export default function AccountantDashboard() {
                     onDischarge={handleDischarge}
                     isDischarging={isDischarging}
                     isConfirmingPayment={isConfirmingPayment}
-                    allowConfirmPayment={activeTab !== 'completed'}
+                    allowConfirmPayment={
+                      activeTab !== 'completed' && user?.role === USER_ROLES.ACCOUNTANT
+                    }
                   />
                 </div>
               ) : (

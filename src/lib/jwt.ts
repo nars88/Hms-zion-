@@ -14,10 +14,17 @@ export interface JWTPayload {
   userId: string
   role: string
   name: string
+  /** Must match `User.authTokenVersion` or the session is treated as revoked. */
+  tokenVersion: number
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {
-  return await new SignJWT({ ...payload })
+  return await new SignJWT({
+    userId: payload.userId,
+    role: payload.role,
+    name: payload.name,
+    tokenVersion: payload.tokenVersion,
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
@@ -27,12 +34,15 @@ export async function signToken(payload: JWTPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET)
-    const p = payload as unknown as Partial<JWTPayload>
+    const p = payload as unknown as Partial<JWTPayload> & { tokenVersion?: number }
     if (!p.userId || !p.role || !p.name) return null
+    const tokenVersion =
+      typeof p.tokenVersion === 'number' && Number.isInteger(p.tokenVersion) ? p.tokenVersion : 0
     return {
       userId: p.userId,
       role: p.role,
       name: p.name,
+      tokenVersion,
     }
   } catch {
     return null

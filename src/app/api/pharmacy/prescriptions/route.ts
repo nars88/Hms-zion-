@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { UserRole, VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/pharmacy/prescriptions
 // Returns visits with prescriptions that are pending (not yet dispensed)
 // Status should be 'Billing' (visit closed by doctor) and prescription field is not empty
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.PHARMACIST) return forbidden()
+
     const visits = await prisma.visit.findMany({
       where: {
         status: VisitStatus.READY_FOR_PHARMACY, // Visit sent to pharmacy by doctor

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { Prisma, VisitStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { forbiddenClinicalAccess, isClinicalAccessAllowed } from '@/lib/rbacClinical'
 
 export const dynamic = 'force-dynamic'
 
@@ -214,6 +216,13 @@ const baseVisitSelect = {
 
 export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+    if (!isClinicalAccessAllowed(user.role)) {
+      return forbiddenClinicalAccess(user, request)
+    }
+
     const url = new URL(request.url)
     const key = url.searchParams.get('key')
     const mode = url.searchParams.get('mode') || 'list'

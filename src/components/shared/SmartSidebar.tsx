@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth, USER_ROLES } from '@/contexts/AuthContext'
 import ZionMedLogo from '@/components/ZionMedLogo'
 import SidebarFooter from '@/components/shared/SidebarFooter'
 import { LayoutDashboard, FolderArchive, Stethoscope } from 'lucide-react'
@@ -11,7 +11,19 @@ import {
   getDepartmentForPath,
   DEPARTMENT_NAV,
   getDashboardHref,
+  ADMIN_DASHBOARD_HREF,
 } from '@/config/sidebarNav'
+import type { DepartmentNavItem } from '@/config/sidebarNav'
+
+function filterClinicalNavForFinanceAdmin(role: string | undefined, items: DepartmentNavItem[]): DepartmentNavItem[] {
+  if (!role || (role !== USER_ROLES.ADMIN && role !== USER_ROLES.ACCOUNTANT)) return items
+  return items.filter((it) => {
+    const base = it.href.split('?')[0].split('#')[0]
+    if (base === '/intake' || base.startsWith('/intake/')) return false
+    if (base === '/doctor' || base.startsWith('/doctor/')) return false
+    return true
+  })
+}
 
 export default function SmartSidebar() {
   const pathname = usePathname()
@@ -22,13 +34,19 @@ export default function SmartSidebar() {
   const isAdmin = user?.role === 'ADMIN'
   const deptKey = getDepartmentForPath(deptPath)
   const deptConfig = deptKey ? DEPARTMENT_NAV[deptKey] : null
-  const navItems = useMemo(
-    () =>
-      deptConfig
-        ? deptConfig.items
-        : [{ href: getDashboardHref(user?.role || 'DOCTOR'), label: 'Dashboard' }],
-    [deptConfig, user?.role]
-  )
+  const navItems = useMemo(() => {
+    const raw: DepartmentNavItem[] = deptConfig
+      ? deptConfig.items
+      : [{ href: getDashboardHref(user?.role || 'DOCTOR'), label: 'Dashboard' }]
+    const filtered = filterClinicalNavForFinanceAdmin(user?.role, raw)
+    if (filtered.length === 0 && user?.role === USER_ROLES.ADMIN) {
+      return [{ href: ADMIN_DASHBOARD_HREF, label: 'Admin home' }]
+    }
+    if (filtered.length === 0 && user?.role === USER_ROLES.ACCOUNTANT) {
+      return [{ href: '/accountant?view=all', label: 'Finance dashboard' }]
+    }
+    return filtered
+  }, [deptConfig, user?.role])
   const activeHref = useMemo(() => {
     return navItems.reduce<string | null>((bestHref, it) => {
       const b = it.href.split('?')[0].split('#')[0]

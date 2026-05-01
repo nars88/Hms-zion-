@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
-import { VisitStatus } from '@prisma/client'
+import { UserRole, VisitStatus } from '@prisma/client'
+import { forbiddenPaymentFinalize, toAuditActor } from '@/lib/rbacClinical'
+import { writeAuditLogTx } from '@/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +16,15 @@ export async function POST(
   try {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
-    if (!['ACCOUNTANT', 'ADMIN'].includes(user.role)) return forbidden()
+    if (user.role !== UserRole.ACCOUNTANT) {
+      if (user.role === UserRole.ADMIN) return forbiddenPaymentFinalize(user, request)
+      return forbidden()
+    }
 
     const { id } = await params
     const body = await request.json()
     const { paymentMethod } = body
 
-    // Find bill
     const bill = await prisma.bill.findUnique({
       where: { id },
       include: {
@@ -35,43 +39,57 @@ export async function POST(
       )
     }
 
-    // Update bill: mark as paid and clear QR status
-    const updatedBill = await prisma.bill.update({
-      where: { id },
-      data: {
-        paymentStatus: 'Paid',
-        paymentMethod: paymentMethod || 'Cash',
-        qrStatus: 'CLEARED', // Automatically unlock exit gate
-        paidAt: new Date(),
-        updatedAt: new Date(),
-      },
-    })
-
-    const visitId = bill.visit?.id
-    if (visitId) {
-      let parsedNotes: Record<string, unknown> = {}
-      try {
-        if (bill.visit.notes) parsedNotes = JSON.parse(bill.visit.notes) as Record<string, unknown>
-      } catch {
-        parsedNotes = {}
-      }
-      const isER =
-        bill.visit.chiefComplaint?.toLowerCase().includes('emergency') ||
-        bill.visit.chiefComplaint?.toLowerCase().includes('er')
-      await prisma.visit.update({
-        where: { id: visitId },
+    const updatedBill = await prisma.$transaction(async (tx) => {
+      const paid = await tx.bill.update({
+        where: { id },
         data: {
-          status: isER ? VisitStatus.Discharged : VisitStatus.COMPLETED,
-          bedNumber: null,
-          notes: JSON.stringify({
-            ...parsedNotes,
-            bedExitState: 'AVAILABLE',
-            bedReleasedAt: new Date().toISOString(),
-          }),
+          paymentStatus: 'Paid',
+          paymentMethod: paymentMethod || 'Cash',
+          qrStatus: 'CLEARED',
+          paidAt: new Date(),
           updatedAt: new Date(),
         },
       })
-    }
+
+      const visitId = bill.visit?.id
+      if (visitId && bill.visit) {
+        let parsedNotes: Record<string, unknown> = {}
+        try {
+          if (bill.visit.notes) parsedNotes = JSON.parse(bill.visit.notes) as Record<string, unknown>
+        } catch {
+          parsedNotes = {}
+        }
+        const isER =
+          bill.visit.chiefComplaint?.toLowerCase().includes('emergency') ||
+          bill.visit.chiefComplaint?.toLowerCase().includes('er')
+        await tx.visit.update({
+          where: { id: visitId },
+          data: {
+            status: isER ? VisitStatus.Discharged : VisitStatus.COMPLETED,
+            bedNumber: null,
+            notes: JSON.stringify({
+              ...parsedNotes,
+              bedExitState: 'AVAILABLE',
+              bedReleasedAt: new Date().toISOString(),
+            }),
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      await writeAuditLogTx(tx, {
+        actor: toAuditActor(user),
+        request,
+        action: 'PAYMENT_FINALIZED',
+        metadata: {
+          billId: id,
+          visitId: bill.visitId,
+          paymentStatus: 'Paid',
+        },
+      })
+
+      return paid
+    })
 
     return NextResponse.json({
       success: true,
@@ -86,4 +104,3 @@ export async function POST(
     )
   }
 }
-

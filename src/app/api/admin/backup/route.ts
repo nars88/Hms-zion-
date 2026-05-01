@@ -43,7 +43,21 @@ export async function GET(request: Request) {
         select: USER_BACKUP_SELECT,
       }),
       prisma.patient.findMany({ orderBy: { createdAt: 'asc' } }),
-      prisma.visit.findMany({ orderBy: { visitDate: 'asc' } }),
+      prisma.visit.findMany({
+        orderBy: { visitDate: 'asc' },
+        select: {
+          id: true,
+          patientId: true,
+          doctorId: true,
+          status: true,
+          visitDate: true,
+          dischargeDate: true,
+          createdAt: true,
+          updatedAt: true,
+          finalDisposition: true,
+          bedNumber: true,
+        },
+      }),
       prisma.$queryRawUnsafe<DepartmentRow[]>(
         `SELECT id, name, description, color, head_employee_id, hod_name, hod_tag, employee_ids, created_at
          FROM departments

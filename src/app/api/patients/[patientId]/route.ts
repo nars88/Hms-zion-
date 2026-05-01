@@ -12,7 +12,7 @@ export async function PATCH(
   try {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
-    if (!['DOCTOR', 'INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+    if (!['DOCTOR', 'INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE'].includes(user.role)) return forbidden()
 
     const { patientId } = await params
     if (!patientId) {

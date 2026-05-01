@@ -1,22 +1,30 @@
 import { NextResponse } from 'next/server'
 import { unstable_noStore as noStore } from 'next/cache'
+import { UserRole } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 // GET /api/accountant/all-bills
 // Returns all visits that have a bill (including ER pending: Waiting/In_Consultation with bill)
-export async function GET() {
+export async function GET(request: Request) {
   noStore()
   // Next may invoke handlers during `next build`; avoid DB I/O on Vercel build workers (env/Prisma engine edge cases).
   if (process.env.NEXT_PHASE === 'phase-production-build') {
     return NextResponse.json({ success: true, bills: [] })
   }
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.ACCOUNTANT && user.role !== UserRole.ADMIN) return forbidden()
+
     const [{ prisma }, { VisitStatus }] = await Promise.all([
       import('@/lib/prisma'),
       import('@prisma/client'),
     ])
+
+    const isAccountant = user.role === UserRole.ACCOUNTANT
 
     // Active queue: exclude Discharged and COMPLETED (archived visits are on /accountant/archive)
     const visits = await prisma.visit.findMany({
@@ -38,11 +46,15 @@ export async function GET() {
           },
         },
         bill: true,
-        medicationOrders: {
-          select: {
-            status: true,
-          },
-        },
+        ...(isAccountant
+          ? {
+              medicationOrders: {
+                select: {
+                  status: true,
+                },
+              },
+            }
+          : {}),
         doctor: {
           select: {
             id: true,
@@ -59,21 +71,26 @@ export async function GET() {
     const allBills = visits
       .filter((visit) => visit.bill) // Only include visits with bills
       .map((visit) => {
-        const medOrderStatus = visit.medicationOrders?.status || null
-        const undispensed =
-          medOrderStatus === 'PENDING' ||
-          medOrderStatus === 'OUT_OF_STOCK'
+        const medOrderStatus = isAccountant
+          ? (visit as { medicationOrders?: { status: string } | null }).medicationOrders?.status || null
+          : null
+        const undispensed = isAccountant
+          ? medOrderStatus === 'PENDING' || medOrderStatus === 'OUT_OF_STOCK'
+          : false
 
-        const billItems =
-          ((visit.bill!.items as Array<{
+        const rawItems =
+          (visit.bill!.items as Array<{
             department?: string
             description?: string
             quantity?: number
             unitPrice?: number
             total?: number
-          }>) || [])
-            // Golden rule: Accountant ignores non-dispensed pharmacy costs.
-            .filter((item) => !(undispensed && String(item.department || '').toLowerCase() === 'pharmacy'))
+          }>) || []
+        const billItems = isAccountant
+          ? rawItems.filter(
+              (item) => !(undispensed && String(item.department || '').toLowerCase() === 'pharmacy')
+            )
+          : rawItems
 
         const subtotal = billItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
         const tax = Number(visit.bill!.tax) || 0

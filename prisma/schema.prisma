@@ -16,6 +16,8 @@ model User {
   name             String
   role             UserRole
   phone            String?
+  /// Incremented on logout / forced revocation so existing JWTs fail API auth (paired with JWT `tokenVersion` claim).
+  authTokenVersion Int        @default(0) @map("auth_token_version")
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   address          String?

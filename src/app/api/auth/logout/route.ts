@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { verifyToken } from '@/lib/jwt'
+import { prisma } from '@/lib/prisma'
+import { unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,8 +9,18 @@ export const dynamic = 'force-dynamic'
 // be removed from the client directly — it has to be expired by the server
 // via a Set-Cookie header.
 export async function POST(request: Request) {
-  const user = await getRequestUser(request)
-  if (!user) return unauthorized()
+  const cookieHeader = request.headers.get('cookie') || ''
+  const tokenMatch = cookieHeader.match(/zionmed_auth_token=([^;]+)/)
+  const token = tokenMatch?.[1]
+  if (!token) return unauthorized()
+
+  const payload = await verifyToken(token)
+  if (!payload?.userId) return unauthorized()
+
+  await prisma.user.update({
+    where: { id: payload.userId },
+    data: { authTokenVersion: { increment: 1 } },
+  })
 
   const response = NextResponse.json({ success: true })
   response.cookies.set('zionmed_auth_token', '', {

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { forbiddenClinicalAccess, isClinicalAccessAllowed } from '@/lib/rbacClinical'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +9,12 @@ export const dynamic = 'force-dynamic'
 // Medical summary for Print Summary: vitals, lab/radiology/sonar results, doctor notes.
 export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!isClinicalAccessAllowed(user.role)) {
+      return forbiddenClinicalAccess(user, request)
+    }
+
     const { searchParams } = new URL(request.url)
     const visitId = searchParams.get('visitId')
     if (!visitId) {

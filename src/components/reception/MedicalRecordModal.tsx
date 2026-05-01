@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Calendar, FileText, Pill, Activity, AlertCircle, Edit2, Save, XCircle } from 'lucide-react'
 import { useVisitData } from '@/contexts/VisitDataContext'
 import { usePatientRegistry } from '@/contexts/PatientRegistryContext'
+import { useAuth, USER_ROLES } from '@/contexts/AuthContext'
 
 interface MedicalRecordModalProps {
   patient: any
@@ -11,6 +12,9 @@ interface MedicalRecordModalProps {
 }
 
 export default function MedicalRecordModal({ patient, onClose }: MedicalRecordModalProps) {
+  const { user } = useAuth()
+  const privacyRestricted =
+    user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.ACCOUNTANT
   const { getVisitData } = useVisitData()
   const { getPatientById, getPatientByPhone, updatePatient, patients } = usePatientRegistry()
   const [isEditMode, setIsEditMode] = useState(false)
@@ -549,7 +553,7 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
           </div>
 
           {/* Chronic Diseases */}
-          {chronicDiseases.length > 0 && (
+          {!privacyRestricted && chronicDiseases.length > 0 && (
             <div className="glass rounded-lg border border-amber-500/30 p-3 bg-amber-500/5">
               <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
                 <AlertCircle size={16} className="text-amber-400" />
@@ -574,7 +578,14 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
               <Calendar size={16} className="text-cyan-400" />
               Visit History
             </h3>
-            {visitData ? (
+            {privacyRestricted ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-4 text-center">
+                <p className="text-sm font-semibold text-amber-200">Privacy Restricted</p>
+                <p className="text-xs text-secondary mt-1">
+                  Clinical visit details are not available for your role.
+                </p>
+              </div>
+            ) : visitData ? (
               <div className="space-y-3">
                 <div className="border-l-2 border-cyan-500/50 pl-4 py-2">
                   <div className="flex items-center justify-between mb-1">
@@ -621,16 +632,30 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
           </div>
 
           {/* Last Prescription */}
-          {lastPrescription && lastPrescription !== 'No prescriptions recorded' && (
+          {privacyRestricted ? (
             <div className="glass rounded-lg border border-slate-800/50 p-3">
               <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
                 <Pill size={16} className="text-emerald-400" />
                 Last Prescription
               </h3>
-              <div className="bg-slate-900/30 rounded-lg p-2.5 border border-slate-800/50">
-                <p className="text-sm text-primary whitespace-pre-wrap">{lastPrescription}</p>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-4 text-center">
+                <p className="text-sm font-semibold text-amber-200">Privacy Restricted</p>
+                <p className="text-xs text-secondary mt-1">Prescription data is not shown for your role.</p>
               </div>
             </div>
+          ) : (
+            lastPrescription &&
+            lastPrescription !== 'No prescriptions recorded' && (
+              <div className="glass rounded-lg border border-slate-800/50 p-3">
+                <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
+                  <Pill size={16} className="text-emerald-400" />
+                  Last Prescription
+                </h3>
+                <div className="bg-slate-900/30 rounded-lg p-2.5 border border-slate-800/50">
+                  <p className="text-sm text-primary whitespace-pre-wrap">{lastPrescription}</p>
+                </div>
+              </div>
+            )
           )}
         </div>
 

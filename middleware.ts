@@ -32,13 +32,13 @@ const ROLE_ROUTES: Record<string, string[]> = {
   '/er/clinic': ['DOCTOR', 'ADMIN'],
   '/er/dashboard': ['DOCTOR', 'ADMIN'],
   '/secretary': ['SECRETARY', 'ADMIN'],
-  '/doctor': ['DOCTOR', 'ADMIN'],
+  '/doctor': ['DOCTOR'],
   '/lab': ['LAB_TECH', 'ADMIN'],
   '/radiology': ['RADIOLOGY_TECH', 'ADMIN'],
   '/pharmacy': ['PHARMACIST', 'ADMIN'],
   '/accountant': ['ACCOUNTANT', 'ADMIN'],
   '/gatekeeper': ['SECURITY', 'ADMIN'],
-  '/intake': ['INTAKE_NURSE', 'ADMIN'],
+  '/intake': ['INTAKE_NURSE'],
   '/reception': ['RECEPTIONIST', 'ADMIN'],
 }
 

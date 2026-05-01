@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { VisitStatus } from '@prisma/client'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { forbiddenClinicalAccess, isClinicalAccessAllowed } from '@/lib/rbacClinical'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
     if (!['DOCTOR', 'ADMIN'].includes(user.role)) return forbidden()
+    if (!isClinicalAccessAllowed(user.role)) {
+      return forbiddenClinicalAccess(user, request)
+    }
 
     const body = (await request.json().catch(() => ({}))) as {
       visitId?: string

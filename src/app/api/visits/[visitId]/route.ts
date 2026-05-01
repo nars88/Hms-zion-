@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { UserRole, VisitStatus } from '@prisma/client'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
+import { forbiddenClinicalAccess, isClinicalAccessAllowed } from '@/lib/rbacClinical'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,12 @@ export async function GET(
   { params }: { params: Promise<{ visitId: string }> }
 ) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (!isClinicalAccessAllowed(user.role)) {
+      return forbiddenClinicalAccess(user, request)
+    }
+
     const { visitId } = await params
     const rows = await prisma.$queryRaw<
       Array<{
@@ -128,11 +135,22 @@ export async function PATCH(
   try {
     const user = await getRequestUser(request)
     if (!user) return unauthorized()
-    if (!['DOCTOR', 'INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE', 'ADMIN'].includes(user.role)) return forbidden()
+
+    const clinicalStaff = ['DOCTOR', 'INTAKE_NURSE', 'ER_INTAKE_NURSE', 'ER_NURSE']
+    const metadataOnly =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.ACCOUNTANT
+    const allowed = clinicalStaff.includes(user.role) || metadataOnly
+    if (!allowed) return forbidden()
 
     const { visitId } = await params
     const body = await request.json()
     const { status, chiefComplaint, notes, bedNumber } = body
+
+    if (metadataOnly && (chiefComplaint !== undefined || notes !== undefined)) {
+      return forbiddenClinicalAccess(user, request)
+    }
+
     const data: {
       status?: VisitStatus
       chiefComplaint?: string
@@ -145,16 +163,16 @@ export async function PATCH(
       if (!valid) return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
       data.status = status as VisitStatus
     }
-    if (chiefComplaint !== undefined) data.chiefComplaint = chiefComplaint
-    if (notes !== undefined) data.notes = notes
+    if (!metadataOnly && chiefComplaint !== undefined) data.chiefComplaint = chiefComplaint
+    if (!metadataOnly && notes !== undefined) data.notes = notes
     if (bedNumber !== undefined) {
       if (bedNumber !== null && (typeof bedNumber !== 'number' || !Number.isInteger(bedNumber) || bedNumber < 1)) {
         return NextResponse.json({ error: 'bedNumber must be a positive integer or null' }, { status: 400 })
       }
       data.bedNumber = bedNumber
     }
-    const notesToStore = data.notes ?? null
-    const chiefComplaintToStore = data.chiefComplaint ?? null
+    const notesToStore = metadataOnly ? null : data.notes ?? null
+    const chiefComplaintToStore = metadataOnly ? null : data.chiefComplaint ?? null
     const bedNumberToStore = data.bedNumber ?? null
     const statusToStore = data.status ?? null
     const updatedAt = data.updatedAt

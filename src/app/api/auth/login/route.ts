@@ -14,7 +14,14 @@ async function findUserWithRetry(email: string, retries = 2) {
       const user = await Promise.race([
         prisma.user.findUnique({
           where: { email },
-          select: { id: true, name: true, email: true, role: true, password: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            password: true,
+            authTokenVersion: true,
+          },
         }),
         new Promise<typeof timeoutMarker>((resolve) => setTimeout(() => resolve(timeoutMarker), DB_LOGIN_TIMEOUT_MS)),
       ])
@@ -70,6 +77,7 @@ export async function POST(request: Request) {
       userId: safeUser.id,
       role: safeUser.role,
       name: safeUser.name,
+      tokenVersion: user.authTokenVersion ?? 0,
     })
 
     const response = NextResponse.json({ success: true, user: safeUser })

@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { UserRole, VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/accountant/pending-bills
 // Returns all visits with COMPLETED status that have pending bills
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.ACCOUNTANT && user.role !== UserRole.ADMIN) return forbidden()
+
     const bills = await prisma.bill.findMany({
       where: {
         paymentStatus: 'Pending',

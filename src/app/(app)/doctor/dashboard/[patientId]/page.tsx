@@ -987,7 +987,7 @@ function DoctorDashboardInner() {
     'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border ring-1'
 
   return (
-    <ProtectedRoute allowedRoles={['DOCTOR', 'ADMIN']} redirectTo="/">
+    <ProtectedRoute allowedRoles={['DOCTOR']} redirectTo="/">
       <div className="flex h-screen max-h-screen overflow-hidden bg-[#0a0f1e]">
         <DoctorSidebar />
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

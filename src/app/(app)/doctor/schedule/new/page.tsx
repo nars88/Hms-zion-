@@ -7,7 +7,7 @@ import { ArrowLeft, CalendarPlus } from 'lucide-react'
 
 export default function NewAppointmentPage() {
   return (
-    <ProtectedRoute allowedRoles={['DOCTOR', 'ADMIN']} redirectTo="/">
+    <ProtectedRoute allowedRoles={['DOCTOR']} redirectTo="/">
       <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <DoctorSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">

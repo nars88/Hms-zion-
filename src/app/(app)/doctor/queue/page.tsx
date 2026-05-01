@@ -206,7 +206,7 @@ export default function DoctorQueueEntrancePage() {
   }, [displayList, search])
 
   return (
-    <ProtectedRoute allowedRoles={['DOCTOR', 'ADMIN']} redirectTo="/">
+    <ProtectedRoute allowedRoles={['DOCTOR']} redirectTo="/">
       <div className="flex h-screen max-h-screen overflow-hidden bg-[#0a0f1e]">
         <DoctorSidebar />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-slate-800/40 bg-[#0a0f1e]">

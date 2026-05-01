@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { UserRole } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +12,10 @@ export async function GET(
   { params }: { params: Promise<{ visitId: string }> }
 ) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.PHARMACIST) return forbidden()
+
     const { visitId } = await params
 
     const visit = await prisma.visit.findUnique({

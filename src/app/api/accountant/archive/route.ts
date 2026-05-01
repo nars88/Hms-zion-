@@ -1,19 +1,27 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { VisitStatus } from '@prisma/client'
+import { UserRole, VisitStatus } from '@prisma/client'
+import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/accountant/archive
 // Returns visits where status is Discharged or COMPLETED (archived)
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getRequestUser(request)
+    if (!user) return unauthorized()
+    if (user.role !== UserRole.ACCOUNTANT && user.role !== UserRole.ADMIN) return forbidden()
+
     const visits = await prisma.visit.findMany({
       where: {
         status: { in: [VisitStatus.Discharged, VisitStatus.COMPLETED] },
         bill: { isNot: null },
       },
-      include: {
+      select: {
+        id: true,
+        patientId: true,
+        updatedAt: true,
         patient: {
           select: {
             id: true,

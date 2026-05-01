@@ -46,7 +46,7 @@ export default function DoctorPrescriptionsPage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['DOCTOR', 'ADMIN']} redirectTo="/">
+    <ProtectedRoute allowedRoles={['DOCTOR']} redirectTo="/">
       <div className="flex h-screen bg-primary text-primary overflow-hidden">
         <SmartSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
