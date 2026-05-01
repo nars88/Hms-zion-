@@ -9,6 +9,8 @@ export const runtime = 'nodejs'
 const MAX_ROWS = 500
 
 // GET /api/admin/audit-logs — ADMIN only; optional filters: user, date (YYYY-MM-DD)
+// IMMUTABLE: Deletion or modification of Audit Logs is strictly prohibited by system architecture.
+// There are no PATCH, PUT, or DELETE handlers for AuditLog — append-only via writeAuditLog only.
 export async function GET(request: Request) {
   try {
     const user = await getRequestUser(request)

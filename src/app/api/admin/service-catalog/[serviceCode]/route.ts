@@ -8,7 +8,13 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 import { writeAuditLog } from '@/lib/auditLog'
-import { ER_ADMISSION_SERVICE_CODE } from '@/lib/billing/erAdmission'
+import {
+  ER_ADMISSION_SERVICE_CODE,
+  MIN_ER_ADMISSION_CATALOG_IQD,
+} from '@/lib/billing/erAdmission'
+
+const ER_ADMISSION_MIN_PRICE_ERROR =
+  'Standard ER Admission Fee cannot be lower than the minimum baseline (10,000 IQD).'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +51,24 @@ export async function PATCH(
       updateData.displayName = body.displayName.trim()
     }
     if (typeof body.basePrice === 'number' && Number.isFinite(body.basePrice) && body.basePrice >= 0) {
+      if (
+        serviceCode === ER_ADMISSION_SERVICE_CODE &&
+        body.basePrice < MIN_ER_ADMISSION_CATALOG_IQD
+      ) {
+        await writeAuditLog(prisma, {
+          actor: user,
+          request,
+          action: 'ER_ADMISSION_FEE_POLICY_VIOLATION',
+          metadata: {
+            entity: 'ServiceCatalog',
+            severity: 'HIGH',
+            details: 'Attempt to set ER_ADMISSION_FEE basePrice below minimum baseline',
+            serviceCode,
+            attemptedPrice: body.basePrice,
+          },
+        })
+        return NextResponse.json({ error: ER_ADMISSION_MIN_PRICE_ERROR }, { status: 400 })
+      }
       updateData.basePrice = body.basePrice
     }
     if (typeof body.isActive === 'boolean') {
@@ -106,6 +130,27 @@ export async function DELETE(
     const serviceCode = decodeURIComponent(rawServiceCode || '').trim()
     if (!serviceCode) {
       return NextResponse.json({ error: 'serviceCode is required.' }, { status: 400 })
+    }
+
+    if (serviceCode === ER_ADMISSION_SERVICE_CODE) {
+      await writeAuditLog(prisma, {
+        actor: user,
+        request,
+        action: 'ER_ADMISSION_FEE_DELETE_BLOCKED',
+        metadata: {
+          entity: 'ServiceCatalog',
+          severity: 'HIGH',
+          details: 'Attempt to delete protected ER_ADMISSION_FEE catalog row',
+          serviceCode,
+        },
+      })
+      return NextResponse.json(
+        {
+          error:
+            'The ER admission fee catalog entry cannot be deleted; it is required for billing integrity.',
+        },
+        { status: 400 }
+      )
     }
 
     await prisma.serviceCatalog.delete({

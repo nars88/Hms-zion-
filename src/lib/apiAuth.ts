@@ -6,6 +6,10 @@ import { prisma } from '@/lib/prisma'
 // Returns the authenticated user (id / role / name) or null. API routes
 // compose this with unauthorized()/forbidden() to enforce access control.
 // Validates JWT `tokenVersion` against `User.authTokenVersion` (logout / revocation).
+//
+// When this returns null (missing cookie, invalid JWT, or authTokenVersion mismatch),
+// handlers MUST use unauthorized() → 401. Do not use forbidden() for null, so session
+// revocation is not confused with RBAC denials (403).
 export async function getRequestUser(request: Request) {
   const cookieHeader = request.headers.get('cookie') || ''
   const tokenMatch = cookieHeader.match(/zionmed_auth_token=([^;]+)/)

@@ -3,7 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 import { BillingUnit, EmergencyTaskCategory, ServiceDepartment } from '@prisma/client'
 import { writeAuditLog } from '@/lib/auditLog'
-import { ER_ADMISSION_SERVICE_CODE } from '@/lib/billing/erAdmission'
+import {
+  ER_ADMISSION_SERVICE_CODE,
+  MIN_ER_ADMISSION_CATALOG_IQD,
+} from '@/lib/billing/erAdmission'
+
+const ER_ADMISSION_MIN_PRICE_ERROR =
+  'Standard ER Admission Fee cannot be lower than the minimum baseline (10,000 IQD).'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +71,25 @@ export async function POST(request: Request) {
     }
     if (!body.billingUnit || !Object.values(BillingUnit).includes(body.billingUnit)) {
       return NextResponse.json({ error: 'Invalid billingUnit.' }, { status: 400 })
+    }
+
+    if (
+      serviceCode === ER_ADMISSION_SERVICE_CODE &&
+      basePrice < MIN_ER_ADMISSION_CATALOG_IQD
+    ) {
+      await writeAuditLog(prisma, {
+        actor: user,
+        request,
+        action: 'ER_ADMISSION_FEE_POLICY_VIOLATION',
+        metadata: {
+          entity: 'ServiceCatalog',
+          severity: 'HIGH',
+          details: 'Attempt to create ER_ADMISSION_FEE with basePrice below minimum baseline',
+          serviceCode,
+          attemptedPrice: basePrice,
+        },
+      })
+      return NextResponse.json({ error: ER_ADMISSION_MIN_PRICE_ERROR }, { status: 400 })
     }
 
     const created = await prisma.serviceCatalog.create({

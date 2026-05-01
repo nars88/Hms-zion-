@@ -5,6 +5,8 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 export interface VisitData {
   patientId: string
   patientName: string
+  /** Optional; shown in medical record when present */
+  chiefComplaint?: string
   diagnosis: string
   prescription: string
   notes: string

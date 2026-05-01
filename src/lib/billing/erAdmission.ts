@@ -2,6 +2,25 @@ import { prisma } from '@/lib/prisma'
 
 export const ER_ADMISSION_SERVICE_CODE = 'ER_ADMISSION_FEE'
 export const DEFAULT_ER_ADMISSION_FEE = 10_000
+/** Catalog / policy floor: admins cannot set ER admission catalog price below this (IQD). */
+export const MIN_ER_ADMISSION_CATALOG_IQD = 10_000
+
+const ER_ADMISSION_DESC = 'er admission fee'
+
+export function isErAdmissionBillItem(item: unknown): boolean {
+  if (!item || typeof item !== 'object') return false
+  const o = item as Record<string, unknown>
+  if (String(o.serviceCode || '').toUpperCase() === ER_ADMISSION_SERVICE_CODE) return true
+  return String(o.description || '')
+    .toLowerCase()
+    .includes(ER_ADMISSION_DESC)
+}
+
+/** Counts lines that represent the standard ER admission fee (race / duplicate guard). */
+export function countErAdmissionBillItems(items: unknown): number {
+  if (!Array.isArray(items)) return 0
+  return items.filter(isErAdmissionBillItem).length
+}
 
 type BillItem = {
   id?: string

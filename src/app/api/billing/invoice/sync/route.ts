@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { forbidden, getRequestUser, unauthorized } from '@/lib/apiAuth'
 import { Prisma } from '@prisma/client'
+import { countErAdmissionBillItems } from '@/lib/billing/erAdmission'
 
 export const dynamic = 'force-dynamic'
 const ER_ADMISSION_MARKER = 'ER Admission Fee'
@@ -50,12 +51,22 @@ export async function POST(request: Request) {
     }
 
     if (!bill) {
+      const createItems = Array.isArray(items) ? items : []
+      if (countErAdmissionBillItems(createItems) > 1) {
+        return NextResponse.json(
+          {
+            error:
+              'Invoice cannot contain more than one ER Admission Fee line. Remove duplicates and sync again.',
+          },
+          { status: 400 }
+        )
+      }
       bill = await prisma.bill.create({
         data: {
           visitId,
           patientId,
           generatedBy: generatedBy || 'system',
-          items: items || [],
+          items: createItems,
           subtotal: subtotal || 0,
           tax: tax || 0,
           discount: discount || 0,
@@ -64,6 +75,16 @@ export async function POST(request: Request) {
         },
       })
     } else {
+      const mergedForCheck = incomingItems ?? (Array.isArray(bill.items) ? bill.items : [])
+      if (countErAdmissionBillItems(mergedForCheck) > 1) {
+        return NextResponse.json(
+          {
+            error:
+              'Invoice cannot contain more than one ER Admission Fee line. Remove duplicates and sync again.',
+          },
+          { status: 400 }
+        )
+      }
       bill = await prisma.bill.update({
         where: { id: bill.id },
         data: {

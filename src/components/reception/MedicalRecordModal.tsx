@@ -5,6 +5,7 @@ import { X, Calendar, FileText, Pill, Activity, AlertCircle, Edit2, Save, XCircl
 import { useVisitData } from '@/contexts/VisitDataContext'
 import { usePatientRegistry } from '@/contexts/PatientRegistryContext'
 import { useAuth, USER_ROLES } from '@/contexts/AuthContext'
+import RestrictedClinicalView from '@/components/shared/RestrictedClinicalView'
 
 interface MedicalRecordModalProps {
   patient: any
@@ -344,8 +345,11 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
     ? fullPatient.medicalHistory.split(/[,\u060C]/).filter(d => d.trim() && d.trim() !== 'None').map(d => d.trim())
     : []
 
-  // Get last prescription
-  const lastPrescription = visitData?.prescription || 'No prescriptions recorded'
+  const lastPrescription = visitData?.prescription || ''
+  const prescriptionLines = lastPrescription
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -572,57 +576,95 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
             </div>
           )}
 
-          {/* Visit History */}
+          {/* Clinical information (visit-linked); restricted roles see HIPAA-style placeholders */}
           <div className="glass rounded-lg border border-slate-800/50 p-3">
             <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
               <Calendar size={16} className="text-cyan-400" />
-              Visit History
+              Clinical information
             </h3>
             {privacyRestricted ? (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-4 text-center">
-                <p className="text-sm font-semibold text-amber-200">Privacy Restricted</p>
-                <p className="text-xs text-secondary mt-1">
-                  Clinical visit details are not available for your role.
-                </p>
+              <div className="space-y-4 mt-1">
+                {(
+                  [
+                    'Chief Complaint',
+                    'Diagnosis',
+                    'Doctor Notes',
+                    'Prescription List',
+                  ] as const
+                ).map((label) => (
+                  <div key={label}>
+                    <h4 className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+                      {label}
+                    </h4>
+                    <RestrictedClinicalView />
+                  </div>
+                ))}
               </div>
             ) : visitData ? (
-              <div className="space-y-3">
-                <div className="border-l-2 border-cyan-500/50 pl-4 py-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-secondary">Last Visit</span>
-                    <span className="text-xs text-secondary">
-                      {new Date(visitData.completedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                  {visitData.diagnosis && (
-                    <div className="mt-2">
-                      <span className="text-xs text-secondary">Diagnosis:</span>
-                      <p className="text-sm text-primary mt-1">{visitData.diagnosis}</p>
-                    </div>
-                  )}
-                  {visitData.labTests && visitData.labTests.length > 0 && (
-                    <div className="mt-2">
-                      <span className="text-xs text-secondary">Lab Tests:</span>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {visitData.labTests.map((test, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 bg-slate-800/50 text-slate-300 rounded text-xs"
-                          >
-                            {test.specificTestName || test.testType}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+              <div className="space-y-3 mt-1">
+                <div className="flex items-center justify-between text-xs text-secondary">
+                  <span>Last visit</span>
+                  <span>
+                    {new Date(visitData.completedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                    Chief Complaint
+                  </h4>
+                  <p className="text-sm text-primary">
+                    {visitData.chiefComplaint?.trim() || '—'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                    Diagnosis
+                  </h4>
+                  <p className="text-sm text-primary">{visitData.diagnosis?.trim() || '—'}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                    Doctor Notes
+                  </h4>
+                  <p className="text-sm text-primary whitespace-pre-wrap">{visitData.notes?.trim() || '—'}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide flex items-center gap-2">
+                    <Pill size={14} className="text-emerald-400" />
+                    Prescription List
+                  </h4>
+                  {prescriptionLines.length > 0 ? (
+                    <ul className="list-disc list-inside text-sm text-primary space-y-1 border border-slate-800/50 rounded-lg p-2.5 bg-slate-900/30">
+                      {prescriptionLines.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-secondary">—</p>
                   )}
                 </div>
+                {visitData.labTests && visitData.labTests.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-800/50">
+                    <span className="text-xs text-secondary">Lab / orders</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {visitData.labTests.map((test, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 bg-slate-800/50 text-slate-300 rounded text-xs"
+                        >
+                          {test.specificTestName || test.testType}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <p className="text-sm text-secondary">No previous visits recorded</p>
+              <p className="text-sm text-secondary">No clinical visit data recorded for this patient.</p>
             )}
             {fullPatient && fullPatient.visitCount > 0 && (
               <p className="text-xs text-secondary mt-3">
@@ -630,33 +672,6 @@ export default function MedicalRecordModal({ patient, onClose }: MedicalRecordMo
               </p>
             )}
           </div>
-
-          {/* Last Prescription */}
-          {privacyRestricted ? (
-            <div className="glass rounded-lg border border-slate-800/50 p-3">
-              <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
-                <Pill size={16} className="text-emerald-400" />
-                Last Prescription
-              </h3>
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-4 text-center">
-                <p className="text-sm font-semibold text-amber-200">Privacy Restricted</p>
-                <p className="text-xs text-secondary mt-1">Prescription data is not shown for your role.</p>
-              </div>
-            </div>
-          ) : (
-            lastPrescription &&
-            lastPrescription !== 'No prescriptions recorded' && (
-              <div className="glass rounded-lg border border-slate-800/50 p-3">
-                <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
-                  <Pill size={16} className="text-emerald-400" />
-                  Last Prescription
-                </h3>
-                <div className="bg-slate-900/30 rounded-lg p-2.5 border border-slate-800/50">
-                  <p className="text-sm text-primary whitespace-pre-wrap">{lastPrescription}</p>
-                </div>
-              </div>
-            )
-          )}
         </div>
 
         {/* Footer - Fixed at bottom with Save/Cancel buttons (only in edit mode) */}
