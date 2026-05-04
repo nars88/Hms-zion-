@@ -6,22 +6,24 @@ import { signToken } from '@/lib/jwt'
 export const dynamic = 'force-dynamic'
 const DB_LOGIN_TIMEOUT_MS = 5000
 
+const userLoginSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  password: true,
+  authTokenVersion: true,
+} as const
+
 async function findUserWithRetry(email: string, retries = 2) {
   let lastError: unknown = null
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       const timeoutMarker = Symbol('db-timeout')
       const user = await Promise.race([
-        prisma.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            password: true,
-            authTokenVersion: true,
-          },
+        prisma.user.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+          select: userLoginSelect,
         }),
         new Promise<typeof timeoutMarker>((resolve) => setTimeout(() => resolve(timeoutMarker), DB_LOGIN_TIMEOUT_MS)),
       ])
@@ -45,11 +47,17 @@ async function findUserWithRetry(email: string, retries = 2) {
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json()
+    const body = (await request.json().catch(() => ({}))) as { email?: unknown; password?: unknown }
+    const email = String(body.email ?? '')
+      .trim()
+      .toLowerCase()
+    const password = String(body.password ?? '')
+      .trim()
+      .replace(/\u00a0/g, ' ')
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
-    const user = await findUserWithRetry(email.toLowerCase().trim())
+    const user = await findUserWithRetry(email)
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }

@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode } from 'react'
+import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { RevenueProvider } from '@/contexts/RevenueContext'
 import { WaitingListProvider } from '@/contexts/WaitingListContext'
@@ -34,5 +35,5 @@ function composeProviders(inner: ReactNode): ReactNode {
 }
 
 export function ComposedProviders({ children }: { children: ReactNode }) {
-  return <>{composeProviders(children)}</>
+  return <QueryProvider>{composeProviders(children)}</QueryProvider>
 }

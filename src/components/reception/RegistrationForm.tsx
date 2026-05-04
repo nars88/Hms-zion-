@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { AlertTriangle, CheckCircle2, Clipboard, Printer, UserRound, X } from 'lucide-react'
@@ -33,6 +33,10 @@ export default function RegistrationForm({
   const [toast, setToast] = useState<string | null>(null)
 
   const title = mode === 'ER' ? 'ER Registration' : 'Clinic Registration'
+
+  useEffect(() => {
+    router.prefetch(mode === 'ER' ? '/emergency/clinic' : '/clinic/dashboard')
+  }, [mode, router])
 
   const qrPayloadString = useMemo(() => {
     if (!saved) return ''

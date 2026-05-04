@@ -1,38 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import DoctorSidebar from '@/components/doctor/DoctorSidebar'
 import { Search, ScanLine, AlertTriangle, UserRound, VenusAndMars } from 'lucide-react'
 import { FaHourglassHalf, FaCheckCircle } from 'react-icons/fa'
-
-type ExamQueuePatient = {
-  visitId: string
-  patientId: string
-  name: string
-  age: number | null
-  gender: string
-  phone: string | null
-  chiefComplaint: string | null
-  triageLevel: number | null
-  allergies: string | null
-  urgencyLevel?: 'NORMAL' | 'MODERATE' | 'EMERGENCY'
-  workflowStatus?:
-    | 'WAITING_EXAM'
-    | 'WAITING_RESULTS'
-    | 'RESULTS_READY'
-    | 'IN_CONSULTATION'
-    | 'WAITING_FOR_RESULTS'
-    | 'SENT_TO_TEST'
-    | 'SENT_TO_LAB'
-  vitals: {
-    bp: string
-    temperature: number
-    heartRate: number
-    weight: number
-  } | null
-}
+import {
+  DOCTOR_QUEUE_QUERY_KEY,
+  fetchDoctorQueueExamBuckets,
+  type ExamQueuePatient,
+} from '@/lib/queries/doctorQueue'
 
 const SELECTED_EXAM_VISIT_STORAGE_KEY = 'zion_doctor_exam_visitId'
 const TEMP_DOCTOR_TEST_PATIENT: ExamQueuePatient = {
@@ -95,74 +74,27 @@ function getUrgencyMeta(level?: ExamQueuePatient['urgencyLevel']) {
 
 export default function DoctorQueueEntrancePage() {
   const router = useRouter()
-  const [examQueue, setExamQueue] = useState<ExamQueuePatient[]>([])
-  const [examReadyForReview, setExamReadyForReview] = useState<ExamQueuePatient[]>([])
-  const [examInProgress, setExamInProgress] = useState<ExamQueuePatient[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  const loadExamQueues = useCallback(async () => {
-    const res = await fetch('/api/doctor/queue')
-    const raw = await res.json().catch(() => null)
-    if (!res.ok) {
-      const msg =
-        raw && typeof raw === 'object' && raw !== null && 'error' in raw
-          ? String((raw as { error?: string }).error)
-          : `Request failed (${res.status})`
-      throw new Error(msg)
-    }
-    const data = raw as {
-      queue?: ExamQueuePatient[]
-      readyForReview?: ExamQueuePatient[]
-      inProgress?: ExamQueuePatient[]
-    }
-    return {
-      queue: Array.isArray(data.queue) ? data.queue : [],
-      readyForReview: Array.isArray(data.readyForReview) ? data.readyForReview : [],
-      inProgress: Array.isArray(data.inProgress) ? data.inProgress : [],
-    }
-  }, [])
+  const queueQuery = useQuery({
+    queryKey: DOCTOR_QUEUE_QUERY_KEY,
+    queryFn: fetchDoctorQueueExamBuckets,
+    staleTime: 15_000,
+    placeholderData: (previousData) => previousData,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+  })
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const { queue, readyForReview, inProgress } = await loadExamQueues()
-        if (cancelled) return
-        setExamQueue(queue)
-        setExamReadyForReview(readyForReview)
-        setExamInProgress(inProgress)
-      } catch (e) {
-        if (!cancelled) {
-          setExamQueue([])
-          setExamReadyForReview([])
-          setExamInProgress([])
-          setError((e as Error)?.message || 'Failed to load waiting list')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    const t = setInterval(async () => {
-      try {
-        const { queue, readyForReview, inProgress } = await loadExamQueues()
-        if (cancelled) return
-        setExamQueue(queue)
-        setExamReadyForReview(readyForReview)
-        setExamInProgress(inProgress)
-        setError(null)
-      } catch (e) {
-        if (!cancelled) setError((e as Error)?.message || 'Failed to refresh queue')
-      }
-    }, 10000)
-    return () => {
-      cancelled = true
-      clearInterval(t)
-    }
-  }, [loadExamQueues])
+  const examQueue = queueQuery.data?.queue ?? []
+  const examReadyForReview = queueQuery.data?.readyForReview ?? []
+  const examInProgress = queueQuery.data?.inProgress ?? []
+  const loading = queueQuery.isPending && !queueQuery.data
+  const error =
+    queueQuery.error instanceof Error
+      ? queueQuery.error.message
+      : queueQuery.error
+        ? String(queueQuery.error)
+        : null
 
   const merged = useMemo(
     () => [TEMP_DOCTOR_TEST_PATIENT, ...examQueue, ...examReadyForReview, ...examInProgress],

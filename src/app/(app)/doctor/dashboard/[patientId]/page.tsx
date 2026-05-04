@@ -287,6 +287,9 @@ function DoctorDashboardInner() {
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false)
   const [notesSaving, setNotesSaving] = useState(false)
   const lastSavedNotesRef = useRef<string>('')
+  /** Latest parsed visit `notes` JSON for merge-without-GET optimistic saves. */
+  const visitNotesDocRef = useRef<Record<string, unknown>>({})
+  const visitNotesPrimedForIdRef = useRef<string | null>(null)
   const examCacheRef = useRef<{ at: number; queue: ExamQueuePatient[]; inProgress: ExamQueuePatient[] } | null>(
     null
   )
@@ -622,41 +625,56 @@ function DoctorDashboardInner() {
     setLabModalOpen(false)
   }, [dashboardTab, resetContextKey])
 
-  const saveClinicalNotesToVisit = useCallback(
-    async (visitId: string, text: string) => {
-      const trimmed = text.trim()
-      if (!visitId) return
-      if (trimmed === (lastSavedNotesRef.current || '').trim()) return
-      setNotesSaving(true)
+  const saveClinicalNotesToVisit = useCallback(async (visitId: string, text: string) => {
+    const trimmed = text.trim()
+    if (!visitId) return
+    if (trimmed === (lastSavedNotesRef.current || '').trim()) return
+    setNotesSaving(true)
+    const previousSaved = lastSavedNotesRef.current
+    const previousDoc = { ...visitNotesDocRef.current }
+    let parsed: Record<string, unknown> = {}
+    if (visitNotesPrimedForIdRef.current === visitId) {
+      parsed = { ...visitNotesDocRef.current }
+    } else {
       try {
         const res = await fetch(`/api/visits/${encodeURIComponent(visitId)}`)
         const data = (await res.json().catch(() => ({}))) as { visit?: { notes?: string | null }; error?: string }
         if (!res.ok) throw new Error(data.error || 'Failed to load visit')
-        let parsed: Record<string, unknown> = {}
         try {
           if (data.visit?.notes) parsed = JSON.parse(String(data.visit.notes)) as Record<string, unknown>
         } catch {
           parsed = {}
         }
-        const nextNotes = JSON.stringify({
-          ...parsed,
-          clinicalImpression: trimmed,
-          clinicalImpressionUpdatedAt: new Date().toISOString(),
-        })
-        const patchRes = await fetch(`/api/visits/${encodeURIComponent(visitId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: nextNotes }),
-        })
-        const patchData = (await patchRes.json().catch(() => ({}))) as { error?: string }
-        if (!patchRes.ok) throw new Error(patchData.error || 'Failed to save notes')
-        lastSavedNotesRef.current = trimmed
-      } finally {
+        visitNotesDocRef.current = parsed
+        visitNotesPrimedForIdRef.current = visitId
+      } catch (e) {
         setNotesSaving(false)
+        throw e
       }
-    },
-    []
-  )
+    }
+    const nextNotes = JSON.stringify({
+      ...parsed,
+      clinicalImpression: trimmed,
+      clinicalImpressionUpdatedAt: new Date().toISOString(),
+    })
+    lastSavedNotesRef.current = trimmed
+    try {
+      visitNotesDocRef.current = JSON.parse(nextNotes) as Record<string, unknown>
+      const patchRes = await fetch(`/api/visits/${encodeURIComponent(visitId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: nextNotes }),
+      })
+      const patchData = (await patchRes.json().catch(() => ({}))) as { error?: string }
+      if (!patchRes.ok) throw new Error(patchData.error || 'Failed to save notes')
+    } catch (e) {
+      visitNotesDocRef.current = previousDoc
+      lastSavedNotesRef.current = previousSaved
+      setNotesSaving(false)
+      throw e
+    }
+    setNotesSaving(false)
+  }, [])
 
   useEffect(() => {
     const visitId = selectedExamPatient?.visitId
@@ -675,6 +693,8 @@ function DoctorDashboardInner() {
         }
         const stored = typeof parsed.clinicalImpression === 'string' ? parsed.clinicalImpression : ''
         if (cancelled) return
+        visitNotesDocRef.current = parsed
+        visitNotesPrimedForIdRef.current = visitId
         if (stored && !clinicalNotes.trim()) setClinicalNotes(stored)
         lastSavedNotesRef.current = stored || clinicalNotes.trim()
       } catch {

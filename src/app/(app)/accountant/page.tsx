@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import SmartSidebar from '@/components/shared/SmartSidebar'
 import { USER_ROLES, useAuth } from '@/contexts/AuthContext'
@@ -11,20 +12,32 @@ import QRSearchBar from '@/components/shared/QRSearchBar'
 import BackButton from '@/components/BackButton'
 import { Invoice, InvoiceItem } from '@/types/billing'
 import MedicalReceipt from '@/components/shared/MedicalReceipt'
+import { InvoiceListRowSkeleton } from '@/components/shared/DataSkeleton'
+import { ACCOUNTANT_BILLS_QUERY_KEY, fetchAccountantBills } from '@/lib/queries/accountantBills'
 
 type InvoiceView = 'all' | 'pending' | 'completed'
 
 export default function AccountantDashboard() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [isDischarging, setIsDischarging] = useState(false)
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
-  
+
   const router = useRouter()
+
+  const billsQuery = useQuery({
+    queryKey: ACCOUNTANT_BILLS_QUERY_KEY,
+    queryFn: fetchAccountantBills,
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+  })
+
+  const invoices = billsQuery.data ?? []
+  const isInitialHydrate = billsQuery.isPending && !billsQuery.data
+  const error = billsQuery.error instanceof Error ? billsQuery.error.message : billsQuery.error ? String(billsQuery.error) : null
   
   // State for active tab (simple state management)
   const [activeTab, setActiveTab] = useState<InvoiceView>('all')
@@ -50,89 +63,78 @@ export default function AccountantDashboard() {
     router.push(`/accountant?view=${tab}`)
   }
 
-  const loadInvoices = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const res = await fetch('/api/accountant/all-bills')
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || 'Failed to load pending bills')
-      }
-
-      const data = await res.json()
-      // Transform the data to match the expected format
-      const transformedInvoices = data.bills.map((bill: any) => {
-        // Parse patient name to extract firstName and lastName
-        const nameParts = bill.patientName?.split(' ') || ['Unknown', 'Patient']
-        const firstName = nameParts[0] || 'Unknown'
-        const lastName = nameParts.slice(1).join(' ') || 'Patient'
-        
-        const subtotal = Number(bill.bill.subtotal) || 0
-        const tax = Number(bill.bill.tax) || 0
-        const discount = Number(bill.bill.discount) || 0
-        const rawTotal = Number(bill.bill.total)
-        const computedTotal = subtotal + tax - discount
-        const safeTotal = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : computedTotal
-
-        return {
-          id: bill.bill.id,
-          visitId: bill.visitId,
-          patient: {
-            id: bill.patientId,
-            firstName: firstName,
-            lastName: lastName,
-            phone: bill.patientPhone || '',
-          },
-          items: bill.bill.items,
-          subtotal,
-          tax,
-          discount,
-          total: safeTotal,
-          paymentStatus: bill.bill.paymentStatus,
-          paymentMethod: bill.bill.paymentMethod,
-          qrCode: bill.bill.qrCode,
-          qrStatus: bill.bill.qrStatus,
-          paidAt: bill.bill.paidAt,
-          createdAt: bill.bill.createdAt,
-          updatedAt: bill.bill.updatedAt,
-          hasUndispensedMedications: Boolean(bill.hasUndispensedMedications),
-          undispensedMedicationStatus: bill.undispensedMedicationStatus || null,
-        }
-      })
-      setInvoices(transformedInvoices)
-    } catch (err: any) {
-      console.error('❌ Failed to load invoices:', err)
-      setError(err?.message || 'Failed to load invoices')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadInvoices()
-    const tick = () => {
-      if (document.visibilityState === 'visible') loadInvoices()
-    }
-    const interval = setInterval(tick, 10000)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [])
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return
     const ch = new BroadcastChannel('zion-billing')
     ch.onmessage = (ev: MessageEvent) => {
       if ((ev?.data as { type?: string } | undefined)?.type === 'billing-updated') {
-        void loadInvoices()
+        void queryClient.invalidateQueries({ queryKey: ACCOUNTANT_BILLS_QUERY_KEY })
       }
     }
     return () => ch.close()
-  }, [])
+  }, [queryClient])
+
+  type PayMutationCtx = { previous: Invoice[] | undefined; previousSelected: Invoice | null }
+
+  const payMutation = useMutation({
+    mutationFn: async (invoice: Invoice) => {
+      if (!user?.id) throw new Error('Session expired')
+      const res = await fetch('/api/accountant/confirm-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitId: invoice.visitId,
+          paymentMethod: 'Cash',
+          confirmedBy: user.id,
+        }),
+      })
+      if (!res.ok) {
+        const errorData = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(errorData.error || 'Failed to confirm payment')
+      }
+      return res.json().catch(() => ({}))
+    },
+    onMutate: async (invoice) => {
+      await queryClient.cancelQueries({ queryKey: ACCOUNTANT_BILLS_QUERY_KEY })
+      const previous = queryClient.getQueryData<Invoice[]>(ACCOUNTANT_BILLS_QUERY_KEY)
+      const previousSelected = selectedInvoice
+      const paidAt = new Date().toISOString()
+      queryClient.setQueryData<Invoice[]>(ACCOUNTANT_BILLS_QUERY_KEY, (old) => {
+        if (!old) return old
+        return old.map((inv) =>
+          inv.visitId === invoice.visitId
+            ? { ...inv, paymentStatus: 'Paid', paymentMethod: 'Cash', qrStatus: 'CLEARED', paidAt }
+            : inv
+        )
+      })
+      setSelectedInvoice((prev) =>
+        prev?.visitId === invoice.visitId
+          ? { ...prev, paymentStatus: 'Paid', paymentMethod: 'Cash', qrStatus: 'CLEARED', paidAt }
+          : prev
+      )
+      return { previous, previousSelected } satisfies PayMutationCtx
+    },
+    onError: (err, _invoice, ctx) => {
+      const c = ctx as PayMutationCtx | undefined
+      if (c?.previous) queryClient.setQueryData(ACCOUNTANT_BILLS_QUERY_KEY, c.previous)
+      setSelectedInvoice(c?.previousSelected ?? null)
+      console.error('❌ Failed to confirm payment:', err)
+      alert(`❌ Failed to confirm payment: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    },
+    onSuccess: () => {
+      alert('✅ Payment confirmed successfully!\n\nBill marked as PAID. QR Status: CLEARED (Green).')
+      setSelectedInvoice(null)
+      setActiveTab((tab) => {
+        if (tab === 'pending') {
+          router.push('/accountant?view=completed')
+          return 'completed'
+        }
+        return tab
+      })
+      void queryClient.invalidateQueries({ queryKey: ACCOUNTANT_BILLS_QUERY_KEY })
+    },
+  })
 
   // Handle QR Scanner navigation
   useEffect(() => {
@@ -155,7 +157,7 @@ export default function AccountantDashboard() {
       })
       if (!res.ok) throw new Error('Failed to discharge')
       setSelectedInvoice(null)
-      await loadInvoices()
+      await queryClient.invalidateQueries({ queryKey: ACCOUNTANT_BILLS_QUERY_KEY })
     } catch (e: any) {
       alert(e?.message || 'Failed to discharge')
     } finally {
@@ -181,40 +183,7 @@ export default function AccountantDashboard() {
     if (!confirm('Confirm Payment?\n\nThis will:\n- Mark the bill as PAID\n- Unlock the QR exit gate\n- Archive the visit')) {
       return
     }
-
-    try {
-      setIsConfirmingPayment(true)
-      const res = await fetch('/api/accountant/confirm-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitId: invoice.visitId,
-          paymentMethod: 'Cash', // Default, can be enhanced with a dropdown
-          confirmedBy: user.id,
-        }),
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to confirm payment')
-      }
-
-      // Data Refresh: Close details panel automatically after Confirm Payment
-      setSelectedInvoice(null)
-      
-      alert('✅ Payment confirmed successfully!\n\nBill marked as PAID. QR Status: CLEARED (Green).')
-      await loadInvoices()
-      
-      // If currently on pending tab, switch to completed to show the updated record
-      if (activeTab === 'pending') {
-        setActiveTab('completed')
-      }
-    } catch (err: any) {
-      console.error('❌ Failed to confirm payment:', err)
-      alert(`❌ Failed to confirm payment: ${err?.message || 'Unknown error'}`)
-    } finally {
-      setIsConfirmingPayment(false)
-    }
+    payMutation.mutate(invoice)
   }
 
   return (
@@ -252,21 +221,21 @@ export default function AccountantDashboard() {
                   {filteredInvoices.length} invoice(s)
                   {activeTab === 'pending' && ' awaiting payment'}
                   {activeTab === 'completed' && ' paid'}
+                  {billsQuery.isFetching && !isInitialHydrate ? (
+                    <span className="ml-2 text-cyan-500/90">· updating</span>
+                  ) : null}
                 </p>
               </div>
 
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {isLoading && filteredInvoices.length === 0 ? (
-                  <div className="space-y-3 py-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="h-16 rounded-xl bg-slate-800/60 animate-pulse" />
-                    ))}
-                  </div>
+                {isInitialHydrate && filteredInvoices.length === 0 ? (
+                  <InvoiceListRowSkeleton count={5} />
                 ) : error ? (
                   <div className="text-center py-12 px-4">
                     <p className="text-sm text-rose-400">{error}</p>
                     <button
-                      onClick={loadInvoices}
+                      type="button"
+                      onClick={() => void billsQuery.refetch()}
                       className="mt-3 text-xs text-emerald-400 hover:text-emerald-300 underline"
                     >
                       Retry
@@ -366,7 +335,7 @@ export default function AccountantDashboard() {
                     onConfirmPayment={() => handleMarkAsPaid(selectedInvoice)}
                     onDischarge={handleDischarge}
                     isDischarging={isDischarging}
-                    isConfirmingPayment={isConfirmingPayment}
+                    isConfirmingPayment={payMutation.isPending}
                     allowConfirmPayment={
                       activeTab !== 'completed' && user?.role === USER_ROLES.ACCOUNTANT
                     }

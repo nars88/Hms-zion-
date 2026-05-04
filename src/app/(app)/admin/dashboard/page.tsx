@@ -1,6 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { AdminDashboardSkeleton } from '@/components/shared/DataSkeleton'
 import {
   AreaChart,
   Area,
@@ -54,6 +57,8 @@ function ChartTooltip({ active, payload, label, valueFormatter }: ChartTooltipPr
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter()
+  const { user } = useAuth()
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -77,6 +82,20 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     void loadDashboard()
   }, [loadDashboard])
+
+  useEffect(() => {
+    if (user?.role !== 'ADMIN') return
+    const routes = [
+      '/doctor/queue',
+      '/accountant?view=all',
+      '/reception',
+      '/er-reception',
+      '/pharmacy/dispense',
+      '/lab',
+      '/radiology',
+    ]
+    routes.forEach((href) => router.prefetch(href))
+  }, [router, user?.role])
 
   const chartRows = useMemo(() => {
     const series = data?.monthlySeries ?? []
@@ -201,6 +220,9 @@ export default function AdminDashboardPage() {
               {fetchError}
             </div>
           ) : null}
+          {loading && !data ? (
+            <AdminDashboardSkeleton />
+          ) : null}
           {backupError ? (
             <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
               {backupError}
@@ -211,7 +233,7 @@ export default function AdminDashboardPage() {
             Revenue counts bills with status Paid/COMPLETED in the month (by <code className="text-slate-600">paidAt</code>, or{' '}
             <code className="text-slate-600">updatedAt</code> if <code className="text-slate-600">paidAt</code> is null).
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${loading && !data ? 'hidden' : ''}`}>
             {stats.map((s) => {
               const Icon = s.icon
               return (
@@ -233,7 +255,7 @@ export default function AdminDashboardPage() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${loading && !data ? 'hidden' : ''}`}>
             <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 min-h-0">
               <h2 className="text-lg font-semibold text-white mb-4">Monthly revenue (paid bills)</h2>
               <div className="h-[280px] w-full">
