@@ -4,7 +4,7 @@
 
 | Role       | Email            | Password  | Redirect              |
 |-----------|------------------|-----------|------------------------|
-| **ER Nurse**  | nurse@zion.med   | nurse123  | `/emergency/nurse` (Bed Management Grid) |
+| **ER Nurse**  | nurse@zion.med   | `Zion@2026` (see `prisma/seed.ts`)  | `/er/mobile-tasks` (canonical ER nurse UI) |
 | **ER Doctor** | doctor@zion.med  | doc123    | `/emergency/doctor` (Doctor's Control Panel) |
 | **Lab Technician** | lab@zion.med | lab123 | `/lab` (Lab Dashboard) |
 
@@ -64,13 +64,13 @@ If the database is unavailable, you can still log in and use the ER Nurse UI wit
 - This uses a fixed ER Nurse user (e.g. `nurse@zion.med` / role `ER_NURSE`) and saves it in **localStorage** (same key as real auth: `zionmed_user`).
 - The sidebar and redirect to `/emergency/nurse` behave the same.
 
-**Important:** With mock auth, **API calls still hit the real backend**. If the DB is down, actions like “Admit to Bed” or “Save Vitals” will fail, and the Accountant/Pharmacy pages will not show new data. To **see actual data** (bills, prescriptions) in Accountant and Pharmacy, the database must be running and seeded; then log in either with real credentials (`nurse@zion.med` / `nurse123` via the normal form) or with the demo button (UI only; data still comes from DB when it’s up).
+**Important:** With mock auth, **API calls still hit the real backend**. If the DB is down, actions like “Admit to Bed” or “Save Vitals” will fail, and the Accountant/Pharmacy pages will not show new data. To **see actual data** (bills, prescriptions) in Accountant and Pharmacy, the database must be running and seeded; then log in with seeded credentials (e.g. `nurse@zion.med` / `Zion@2026` per `prisma/seed.ts`) or with the demo button when present (UI only; data still comes from DB when it’s up).
 
 ---
 
 ## Quick Test Checklist
 
-1. **Database + seed:** `npm run db:seed` (creates `nurse@zion.med` / `nurse123`).
-2. **Real login:** Log in with `nurse@zion.med` / `nurse123` → redirect to `/emergency/nurse`.
+1. **Database + seed:** `npm run db:seed` (creates users; shared temp password in `prisma/seed.ts`).
+2. **Real login:** Log in with `nurse@zion.med` / temp password from seed → redirect to canonical ER routes (`/er/mobile-tasks`).
 3. **Admit a patient** to a bed → then open **Accountant** (`/accountant`) and confirm the new ER bill appears.
 4. **Pharmacy:** Open **Pharmacy** (`/pharmacy`); prescriptions for visits (including ER visits once a doctor prescribes) appear from the same DB.

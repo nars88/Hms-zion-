@@ -298,11 +298,11 @@ model PriceSettings {
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js",
+    "db:seed": "npx tsx prisma/seed.ts",
     "create:pharmacist": "node scripts/create-pharmacist.js"
   },
   "prisma": {
-    "seed": "node prisma/seed.js"
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

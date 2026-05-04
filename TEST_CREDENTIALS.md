@@ -1,74 +1,46 @@
-# ZION Med - Test Credentials
+# NARS Hospital — Test Credentials
 
-## Default Test Accounts
+**Source of truth:** `prisma/seed.ts` — constant **`NARS_SEED_TEMP_PASSWORD`** (default **`Zion@2026`**) applies to **every** seeded user after `npm run db:seed`.
 
-Use these credentials to test each role in the ZION Hospital Management System.
+## Default Test Accounts (abbreviated)
 
-| Role | Email | Password | Dashboard URL | Access Level |
-|------|-------|----------|---------------|--------------|
-| **Admin** | `admin@zionmed.com` | `admin123` | `/admin` | Full system access - All modules, employee management, system settings |
-| **Receptionist** | `reception@zionmed.com` | `reception123` | `/reception` | Patient registration, billing overview, intake coordination |
-| **Intake Nurse** | `intake@zionmed.com` | `intake123` | `/intake` | Patient registration, vitals entry, triage level assignment |
-| **Doctor** | `doctor@zionmed.com` | `doctor123` | `/doctor` | Patient consultation, diagnosis, prescription, lab orders |
-| **Pharmacist** | `pharmacy@zionmed.com` | `pharmacy123` | `/pharmacy` | Prescription queue, medication dispensing, allergy safety checks |
-| **Accountant** | `accountant@zionmed.com` | `accountant123` | `/accountant` | Invoice management, payment processing, QR status control |
+| Role | Example email | Password | Notes |
+|------|---------------|----------|--------|
+| **Admin** | `admin@zionmed.com` | `Zion@2026` | See full list in `prisma/seed.ts` (`SEED_USERS`) |
+| **Receptionist** | `reception@zionmed.com` | `Zion@2026` | |
+| **Intake Nurse** | `intake@zionmed.com` | `Zion@2026` | |
+| **Doctor** | `doctor@zionmed.com` | `Zion@2026` | |
+| **Pharmacist** | `pharmacy@zion.com` | `Zion@2026` | |
+| **Accountant** | `accountant@zionmed.com` | `Zion@2026` | |
 
 ---
 
 ## Quick Reference by Testing Scenario
 
 ### Scenario A: Routine Clinic Patient Flow
-1. **Receptionist** → Register patient
-   - Email: `reception@zionmed.com`
-   - Password: `reception123`
-
-2. **Intake Nurse** → Record vitals (Triage 4-5)
-   - Email: `intake@zionmed.com`
-   - Password: `intake123`
-
-3. **Doctor** → Consult and prescribe
-   - Email: `doctor@zionmed.com`
-   - Password: `doctor123`
-
-4. **Pharmacist** → Dispense medication
-   - Email: `pharmacy@zionmed.com`
-   - Password: `pharmacy123`
-
-5. **Accountant** → Process payment
-   - Email: `accountant@zionmed.com`
-   - Password: `accountant123`
+1. **Receptionist** → `reception@zionmed.com` / `Zion@2026`
+2. **Intake Nurse** → `intake@zionmed.com` / `Zion@2026`
+3. **Doctor** → `doctor@zionmed.com` / `Zion@2026`
+4. **Pharmacist** → `pharmacy@zion.com` / `Zion@2026`
+5. **Accountant** → `accountant@zionmed.com` / `Zion@2026`
 
 ### Scenario B: Critical ER Patient Flow
-1. **Receptionist** → Register ER patient
-   - Email: `reception@zionmed.com`
-   - Password: `reception123`
-
-2. **Intake Nurse** → Record critical vitals (Triage 1-2)
-   - Email: `intake@zionmed.com`
-   - Password: `intake123`
-
-3. **Doctor** → See flashing red alert, diagnose
-   - Email: `doctor@zionmed.com`
-   - Password: `doctor123`
-
-4. **Pharmacist** → Test allergy conflict alert
-   - Email: `pharmacy@zionmed.com`
-   - Password: `pharmacy123`
-
-5. **Accountant** → View invoice (privacy check)
-   - Email: `accountant@zionmed.com`
-   - Password: `accountant123`
+1. **Receptionist** → `reception@zionmed.com` / `Zion@2026`
+2. **Intake Nurse** → `intake@zionmed.com` / `Zion@2026`
+3. **Doctor** → `doctor@zionmed.com` / `Zion@2026`
+4. **Pharmacist** → `pharmacy@zion.com` / `Zion@2026`
+5. **Accountant** → `accountant@zionmed.com` / `Zion@2026`
 
 ---
 
 ## Additional Roles (If Needed)
 
-| Role | Email | Password | Dashboard URL |
-|------|-------|----------|---------------|
-| **ER Nurse** | `ernurse@zionmed.com` | `ernurse123` | `/doctor` |
-| **Secretary** | `secretary@zionmed.com` | `secretary123` | `/doctor` |
-| **Security** | `security@zionmed.com` | `security123` | `/security` |
-| **Lab Tech** | `lab@zionmed.com` | `lab123` | `/lab` |
+| Role | Email | Password |
+|------|-------|----------|
+| **ER Nurse** | `ernurse@zionmed.com` | `Zion@2026` |
+| **Secretary** | `secretary@zionmed.com` | `Zion@2026` |
+| **Security** | `security@zionmed.com` | `Zion@2026` |
+| **Lab Tech** | `lab@zion.com` | `Zion@2026` |
 
 ---
 
@@ -79,14 +51,10 @@ Use these credentials to test each role in the ZION Hospital Management System.
 Run the seed script to automatically create all test users:
 
 ```bash
-# Run the seed script (uses Node.js directly, no additional dependencies needed)
 npm run db:seed
 ```
 
-Or run directly:
-```bash
-node prisma/seed.js
-```
+Runs `npx tsx prisma/seed.ts` (see `package.json` → `prisma.seed`).
 
 **✅ All test users have been created successfully!**
 

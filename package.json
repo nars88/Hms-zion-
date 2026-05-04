@@ -17,7 +17,7 @@
     "db:sync:admin-tables": "node scripts/db-execute-push-url.mjs scripts/sql/sync-system-settings-audit-log.sql",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js",
+    "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:service-catalog": "node scripts/seed-service-catalog.mjs",
     "db:indexes": "node scripts/add-indexes.mjs",
     "db:departments": "prisma db execute --file prisma/migrations/manual_departments.sql --schema prisma/schema.prisma",
@@ -28,7 +28,7 @@
     "playwright:install": "playwright install chromium"
   },
   "prisma": {
-    "seed": "node prisma/seed.js"
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -56,6 +56,7 @@
     "postcss": "^8.4.32",
     "prisma": "6.19.3",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3"
   }
 }

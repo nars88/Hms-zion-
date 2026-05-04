@@ -84,15 +84,15 @@ Required environment variables:
 - `npm run db:push` - Push schema changes to database
 - `npm run db:migrate` - Run database migrations
 - `npm run db:studio` - Open Prisma Studio
-- `npm run db:seed` - Seed test users (ER Nurse: `nurse@zion.med` / `nurse123` → `/emergency/nurse`; ER Doctor: `doctor@zion.med` / `doc123` → `/emergency/doctor`)
+- `npm run db:seed` - Seed test users via `prisma/seed.ts` (shared temp password `Zion@2026` by default — see `NARS_SEED_TEMP_PASSWORD` in that file)
 
 ## Auth & Test Accounts
 
 - **Credentials** are stored in the **database** (PostgreSQL). Table: `users`. Login: `POST /api/auth/login`.
-- **Run `npm run db:seed`** to create test users. Then log in with:
-  - **ER Doctor:** `doctor@zion.med` / `doc123` → redirects to `/emergency/doctor`
-  - **ER Nurse:** `nurse@zion.med` / `nurse123` → redirects to `/emergency/nurse`
-  - **Admin:** `admin@zionmed.com` / `admin123` → `/admin/dashboard`
+- **Run `npm run db:seed`** to create/update test users. **All** seeded accounts use the same temporary password from **`prisma/seed.ts`** (`NARS_SEED_TEMP_PASSWORD`, default `Zion@2026`). Examples:
+  - **ER Doctor:** `doctor@zion.med` / `Zion@2026` → ER physician routes (`/er/…`)
+  - **ER Nurse:** `nurse@zion.med` / `Zion@2026` → `/er/mobile-tasks`
+  - **Admin:** `admin@zionmed.com` / `Zion@2026` → `/admin/dashboard`
 - **ER Nurse → Accountant:** Admitting a patient creates a **Bill** (ER Admission Fee).
 - **ER Nurse → Pharmacy:** Pharmacy shows prescriptions from visits in the same DB.
 

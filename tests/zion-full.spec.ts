@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-/** Defaults match `prisma/seed.js` — override with ZION_ADMIN_EMAIL / ZION_ADMIN_PASSWORD in env */
+/** Defaults match `prisma/seed.ts` (NARS_SEED_TEMP_PASSWORD) — override with ZION_ADMIN_EMAIL / ZION_ADMIN_PASSWORD in env */
 const ADMIN_EMAIL = process.env.ZION_ADMIN_EMAIL ?? 'admin@zionmed.com'
-const ADMIN_PASSWORD = process.env.ZION_ADMIN_PASSWORD ?? 'admin123'
+const ADMIN_PASSWORD = process.env.ZION_ADMIN_PASSWORD ?? 'Zion@2026'
 const LAB_EMAIL = process.env.ZION_LAB_EMAIL ?? 'lab@zion.com'
 const LAB_PASSWORD = process.env.ZION_LAB_PASSWORD ?? 'lab123'
 

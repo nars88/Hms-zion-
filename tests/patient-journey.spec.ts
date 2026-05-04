@@ -4,7 +4,7 @@ const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
 const ADMIN = {
   email: process.env.ZION_ADMIN_EMAIL || 'admin@zionmed.com',
-  password: process.env.ZION_ADMIN_PASSWORD || 'admin123',
+  password: process.env.ZION_ADMIN_PASSWORD || 'Zion@2026',
 }
 
 // ── Helper: login via UI and return cookies ──────────────
