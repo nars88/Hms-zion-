@@ -8,9 +8,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   try {
     const user = await getRequestUser(request)
-    if (!user) return NextResponse.json({ authenticated: false }, { status: 401 })
+    // Keep this endpoint 200 even for anonymous sessions to avoid noisy
+    // browser-console 401 spam on the login page.
+    if (!user) return NextResponse.json({ authenticated: false }, { status: 200 })
     return NextResponse.json({ authenticated: true, user })
   } catch {
-    return NextResponse.json({ authenticated: false }, { status: 401 })
+    return NextResponse.json({ authenticated: false }, { status: 200 })
   }
 }

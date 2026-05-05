@@ -43,7 +43,8 @@ export default function LoginPage() {
       }
       try {
         const res = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'include' })
-        if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { authenticated?: boolean }
+        if (!res.ok || payload.authenticated !== true) {
           // Local stale user without valid JWT cookie -> clear and stay on login.
           logout()
           if (!cancelled) setIsCheckingAuth(false)
