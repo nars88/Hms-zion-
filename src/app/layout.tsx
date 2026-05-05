@@ -15,7 +15,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Zion Med - Hospital Management System',
+  title: 'NARS Hospital - Hospital Management System',
   description: 'Premium modern medical facility management system',
 }
 

@@ -62,7 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('zionmed_user')
       if (savedUser) {
-        const parsedUser = JSON.parse(savedUser) as User
+        let parsedUser: User
+        try {
+          parsedUser = JSON.parse(savedUser) as User
+        } catch {
+          localStorage.removeItem('zionmed_user')
+          return null
+        }
         // The signed JWT is now httpOnly (JS cannot see it). We rely on the
         // JS-readable role cookie as a presence signal — if it was cleared
         // (by logout, expired session, or middleware wipe) we also discard
@@ -90,11 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
     if (typeof window !== 'undefined') {
       localStorage.setItem('zionmed_user', JSON.stringify(userData))
-      // Note: zionmed_auth_token is now set server-side as httpOnly by the
-      // /api/auth/login response. We only mirror the role cookie here as a
-      // safety net in case the browser dropped the Set-Cookie (non-HTTPS
-      // quirks, iframes, etc.) — this cookie is UI-only and never trusted.
-      document.cookie = `zionmed_user_role=${userData.role}; path=/; max-age=86400`
     }
   }
 

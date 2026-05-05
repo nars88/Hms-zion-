@@ -8,7 +8,7 @@
     "dev": "next dev",
     "clean:next": "node -e \"const fs=require('fs');['.next','node_modules/.cache'].forEach(p=>{if(fs.existsSync(p))fs.rmSync(p,{recursive:true,force:true});});console.log('Cleaned Next cache');\"",
     "dev:clean": "npm run clean:next && next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",

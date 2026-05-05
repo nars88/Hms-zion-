@@ -30,19 +30,35 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  const { login, user } = useAuth()
+  const { login, logout, user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    let cancelled = false
+    ;(async () => {
+      if (!user) {
+        if (!cancelled) setIsCheckingAuth(false)
+        return
+      }
+      try {
+        const res = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'include' })
+        if (!res.ok) {
+          // Local stale user without valid JWT cookie -> clear and stay on login.
+          logout()
+          if (!cancelled) setIsCheckingAuth(false)
+          return
+        }
+      } catch {
+        logout()
+        if (!cancelled) setIsCheckingAuth(false)
+        return
+      }
 
-    setIsCheckingAuth(false)
-
-    if (user) {
       const redirectPath = sessionStorage.getItem('redirectAfterLogin')
       if (redirectPath) {
         sessionStorage.removeItem('redirectAfterLogin')
-        router.replace(redirectPath)
+        if (!cancelled) router.replace(redirectPath)
         return
       }
 
@@ -55,10 +71,12 @@ export default function LoginPage() {
             : userEmail === 'pharmacy@zion.med'
               ? '/pharmacy/dispense'
               : REDIRECT_MAP[user.role] || '/admin/dashboard'
-
-      router.replace(defaultPath)
+      if (!cancelled) router.replace(defaultPath)
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [user, router])
+  }, [user, router, logout])
 
   if (isCheckingAuth) {
     return (
@@ -90,6 +108,7 @@ export default function LoginPage() {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
