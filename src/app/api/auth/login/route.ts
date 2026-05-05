@@ -89,10 +89,11 @@ export async function POST(request: Request) {
     })
 
     const response = NextResponse.json({ success: true, user: safeUser })
+    const secureCookie = process.env.NODE_ENV === 'production'
     // httpOnly: JS cannot read or forge it (XSS-safe).
     response.cookies.set('zionmed_auth_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 24 hours
       path: '/',
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
     // non-authoritative (server always re-verifies via the JWT).
     response.cookies.set('zionmed_user_role', safeUser.role, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24,
       path: '/',

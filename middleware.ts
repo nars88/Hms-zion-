@@ -11,6 +11,10 @@ const PUBLIC_EXACT = new Set<string>(['/', '/login'])
 const PUBLIC_PREFIXES = [
   '/api/auth/login',
   '/api/auth/logout',
+  // Session probe must bypass Edge JWT gate: middleware runs on the Edge runtime,
+  // while login signs JWTs on Node — if JWT_SECRET isn't available to Edge, verification
+  // fails with 401 before the route handler runs. The handler uses the same secret as login.
+  '/api/auth/session',
   '/api/auth/verify-role',
   '/api/system/branding',
   '/api/health',
@@ -58,8 +62,15 @@ const API_ROLE_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
 /** These prefixes require ADMIN for every method (including GET). */
 const API_ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/employees'] as const
 
+/** Normalize so `/login/` and `/login` both hit PUBLIC_EXACT / role rules consistently. */
+function normalizePathname(pathname: string): string {
+  const p = pathname || '/'
+  if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1)
+  return p
+}
+
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const pathname = normalizePathname(request.nextUrl.pathname)
 
   // Anonymous marketing `/` — no cookie → skip auth entirely.
   if ((pathname === '/' || pathname === '') && !request.cookies.get('zionmed_auth_token')?.value?.trim()) {

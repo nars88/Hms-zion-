@@ -6,9 +6,14 @@ import { SignJWT, jwtVerify } from 'jose'
 //   - /api/auth/logout         → clears the cookie
 //   - /lib/apiAuth.ts          → identifies the caller for API route auth
 //   - middleware.ts (via fetch to verify-role)
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'zion-med-secret-change-in-production-2025'
-)
+//
+// Prefer JWT_SECRET; accept NEXTAUTH_SECRET so Vercel projects that only set Auth.js-style
+// env still mint/verify tokens consistently across Node route handlers and Edge middleware.
+const RAW_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  'nars-hospital-dev-secret-change-in-production'
+const SECRET = new TextEncoder().encode(RAW_SECRET)
 
 export interface JWTPayload {
   userId: string
